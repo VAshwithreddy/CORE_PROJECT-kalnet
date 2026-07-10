@@ -78,6 +78,16 @@ src/
     query-keys.ts
 ```
 
+## Design guidance
+
+Before building frontend pages or components, read:
+
+- `frontend/docs/CORE_DESIGN_SYSTEM.md`
+- `frontend/docs/PAGE_AND_COMPONENT_SPECS.md`
+- `frontend/src/design/README.md`
+
+Use the shared design tokens in `frontend/src/design/tokens.css` and `frontend/src/design/tokens.ts` so every page looks like one product.
+
 ## What each folder is for
 
 `src/app/` is for application pages and routes.
