@@ -11,10 +11,16 @@ frontend/
 backend/
 ```
 
-The frontend architecture from the reference image was created inside:
+The frontend is now a Next.js and TypeScript setup with the route architecture inside:
 
 ```text
 frontend/src/
+```
+
+The backend is now a FastAPI setup inside:
+
+```text
+backend/src/
 ```
 
 The main frontend sections are:
@@ -41,6 +47,50 @@ The process was:
 9. Commit the setup using Git.
 
 Git does not track empty folders by default. That is why `.gitkeep` files were added. When a folder later contains real code, the `.gitkeep` file can stay or be removed.
+
+## What frontend and backend setup now means
+
+Frontend setup means the user-facing app can run locally and has a place for pages, layouts, shared UI components, design tokens, API calls, auth helpers, route rules, and feature logic.
+
+Backend setup means the server can run locally and has a place for API routes, configuration, schemas, services, database logic, authentication, and future AIML integration.
+
+The setup checkpoint is:
+
+```text
+Frontend runs on http://localhost:3000
+Backend responds on http://localhost:8000/health
+Frontend can be configured to call the backend through NEXT_PUBLIC_API_BASE_URL
+```
+
+## Running the project locally
+
+Frontend:
+
+```bash
+cd frontend
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Backend:
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn src.main:app --reload
+```
+
+Open these URLs:
+
+```text
+Frontend: http://localhost:3000
+Backend health: http://localhost:8000/health
+Backend docs: http://localhost:8000/docs
+```
 
 ## How teammates should get access
 
@@ -115,11 +165,11 @@ git push origin feature/status-badge
 
 ## Recommended next steps
 
-1. Push the current local commit to GitHub.
+1. Push the current local setup branch to GitHub.
 2. Add teammates as collaborators.
-3. Decide the frontend technology setup, such as Next.js, React, TypeScript, Tailwind, or another stack.
-4. Decide the backend technology setup, such as Node.js, Express, NestJS, Django, Spring Boot, or another stack.
-5. Assign small first tasks to teammates.
+3. Ask every teammate to run frontend and backend locally.
+4. Assign one small MVP task per teammate.
+5. Build the first flow: login -> intake -> routing -> assignment -> employee update -> blocker -> audit.
 6. Use pull requests for review before merging into `main`.
 
 ## Important safety rule
