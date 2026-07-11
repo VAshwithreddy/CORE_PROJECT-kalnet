@@ -1,0 +1,54 @@
+:root {
+  --core-bg: #f6f8fb;
+  --core-surface: #ffffff;
+  --core-surface-muted: #f1f5f9;
+  --core-border: #d9e1ea;
+  --core-border-strong: #b7c4d3;
+
+  --core-text: #172033;
+  --core-text-muted: #5b6472;
+  --core-text-subtle: #7a8494;
+  --core-text-inverse: #ffffff;
+
+  --core-brand: #0f766e;
+  --core-brand-hover: #115e59;
+  --core-brand-soft: #ccfbf1;
+
+  --core-info: #2563eb;
+  --core-info-soft: #dbeafe;
+  --core-success: #15803d;
+  --core-success-soft: #dcfce7;
+  --core-warning: #b45309;
+  --core-warning-soft: #fef3c7;
+  --core-danger: #b91c1c;
+  --core-danger-soft: #fee2e2;
+  --core-executive: #6d28d9;
+  --core-executive-soft: #ede9fe;
+
+  --core-focus: #2563eb;
+  --core-shadow-sm: 0 1px 2px rgb(15 23 42 / 8%);
+  --core-shadow-md: 0 8px 20px rgb(15 23 42 / 10%);
+
+  --core-radius-sm: 6px;
+  --core-radius-md: 8px;
+  --core-radius-lg: 12px;
+
+  --core-space-1: 4px;
+  --core-space-2: 8px;
+  --core-space-3: 12px;
+  --core-space-4: 16px;
+  --core-space-6: 24px;
+  --core-space-8: 32px;
+  --core-space-10: 40px;
+  --core-space-12: 48px;
+  --core-space-16: 64px;
+
+  --core-font-sans: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  --core-text-xs: 12px;
+  --core-text-sm: 14px;
+  --core-text-base: 16px;
+  --core-text-lg: 18px;
+  --core-text-xl: 20px;
+  --core-text-2xl: 24px;
+  --core-text-3xl: 32px;
+}
