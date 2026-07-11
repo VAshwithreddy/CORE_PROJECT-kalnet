@@ -2,18 +2,89 @@
 
 This repository is the shared workspace for the CORE project.
 
+CORE is being built as a role-based work management platform for:
+
+- work intake
+- routing
+- assignments
+- blockers
+- approvals
+- audit history
+- reporting and digest generation
+
 ## Project folders
 
 ```text
 CORE_PROJECT-kalnet/
-  frontend/   Frontend application architecture and UI code
-  backend/    Backend API, services, database, and server-side code
+  frontend/   Next.js frontend application and UI architecture
+  backend/    FastAPI backend foundation, API routes, and server-side code
+  docs/       Team workflow and planning documents
 ```
 
-The first frontend architecture has been created from the reference image under:
+The frontend architecture has been created under:
 
 ```text
 frontend/src/
+```
+
+The backend health API has been created under:
+
+```text
+backend/src/
+```
+
+## Current setup status
+
+The project now has a basic runnable foundation:
+
+- Frontend package setup with Next.js, TypeScript, global styles, and starter role pages.
+- Backend FastAPI setup with health and setup-summary endpoints.
+- Environment examples for both frontend and backend.
+- Design tokens and frontend documentation for consistent UI work.
+
+This is still the setup stage, not the final product. The next development target should be the MVP workflow:
+
+```text
+login
+-> work intake
+-> routing
+-> assignment creation
+-> employee progress update
+-> blocker tracking
+-> audit history
+```
+
+## Run the frontend
+
+```bash
+cd frontend
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+## Run the backend
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn src.main:app --reload
+```
+
+Open:
+
+```text
+http://localhost:8000/health
+http://localhost:8000/api/v1/setup-summary
 ```
 
 ## How the team should work
@@ -60,3 +131,4 @@ When you want to add more folders or files later:
 4. Run `git add .`, `git commit -m "Your message"`, and `git push`.
 
 Use `frontend/README.md` for frontend-specific guidance.
+Use `backend/README.md` for backend-specific guidance.

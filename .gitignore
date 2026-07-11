@@ -1,11 +1,19 @@
 # Dependencies
 node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
 
 # Build outputs
 .next/
 dist/
 build/
 coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
 
 # Environment files
 .env

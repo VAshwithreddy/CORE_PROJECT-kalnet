@@ -1,6 +1,38 @@
 # Frontend
 
-This folder contains the frontend architecture from the reference image.
+This folder contains the CORE frontend. It is set up as a Next.js and TypeScript app using the existing role-based architecture.
+
+## Run locally
+
+```bash
+cd frontend
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+The frontend expects the backend API base URL in:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+## Current setup
+
+The setup now includes:
+
+- `package.json` with Next.js scripts.
+- `tsconfig.json` with the `@/*` import alias.
+- `src/app/layout.tsx` and `src/app/globals.css`.
+- A setup landing page at `/`.
+- Starter role pages for employee, department, work admin, executive, and system admin areas.
+- Shared API helper in `src/lib/api-client.ts`.
 
 ## Folder map
 
@@ -77,6 +109,29 @@ src/
     scope.ts
     query-keys.ts
 ```
+
+## Design guidance
+
+Before building frontend pages or components, read:
+
+- `frontend/docs/CORE_DESIGN_SYSTEM.md`
+- `frontend/docs/PAGE_AND_COMPONENT_SPECS.md`
+- `frontend/docs/README.md`
+- `frontend/src/design/README.md`
+
+Use the shared design tokens in `frontend/src/design/tokens.css` and `frontend/src/design/tokens.ts` so every page looks like one product.
+
+## First frontend build target
+
+Build the MVP pages in this order:
+
+1. Login and role redirect.
+2. Work admin intake and routing.
+3. Department assignments and blockers.
+4. Employee home and my work.
+5. Audit timeline for important changes.
+
+Do not build every page at once. First complete one working flow from intake to assignment update.
 
 ## What each folder is for
 

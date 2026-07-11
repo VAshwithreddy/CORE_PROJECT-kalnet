@@ -9,6 +9,10 @@ export async function apiClient<TResponse>(
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   const headers = new Headers(options.headers);
 
+  if (!headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
   if (options.token) {
     headers.set("Authorization", `Bearer ${options.token}`);
   }
@@ -19,7 +23,8 @@ export async function apiClient<TResponse>(
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    const message = await response.text();
+    throw new Error(message || `API request failed with status ${response.status}`);
   }
 
   return response.json() as Promise<TResponse>;
