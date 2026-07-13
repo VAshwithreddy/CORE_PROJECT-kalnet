@@ -2,16 +2,18 @@
   --core-bg: #f6f8fb;
   --core-surface: #ffffff;
   --core-surface-muted: #f1f5f9;
-  --core-border: #d9e1ea;
+  --core-surface-raised: #ffffff;
+  --core-border: #e2e8f0;
   --core-border-strong: #b7c4d3;
 
-  --core-text: #172033;
-  --core-text-muted: #5b6472;
-  --core-text-subtle: #7a8494;
+  --core-text: #0f172a;
+  --core-text-muted: #475569;
+  --core-text-subtle: #94a3b8;
   --core-text-inverse: #ffffff;
 
   --core-brand: #0f766e;
   --core-brand-hover: #115e59;
+  --core-brand-dark: #134e4a;
   --core-brand-soft: #ccfbf1;
 
   --core-info: #2563eb;
@@ -26,13 +28,29 @@
   --core-executive-soft: #ede9fe;
 
   --core-focus: #2563eb;
-  --core-shadow-sm: 0 1px 2px rgb(15 23 42 / 8%);
-  --core-shadow-md: 0 8px 20px rgb(15 23 42 / 10%);
 
+  /* ── Premium Shadow Elevation System ─── */
+  --core-shadow-xs: 0 1px 2px rgb(15 23 42 / 4%);
+  --core-shadow-sm: 0 1px 3px rgb(15 23 42 / 6%), 0 1px 2px rgb(15 23 42 / 4%);
+  --core-shadow-md: 0 4px 6px -1px rgb(15 23 42 / 7%), 0 2px 4px -2px rgb(15 23 42 / 5%);
+  --core-shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 8%), 0 4px 6px -4px rgb(15 23 42 / 5%);
+  --core-shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 10%), 0 8px 10px -6px rgb(15 23 42 / 6%);
+  --core-shadow-float: 0 24px 48px -12px rgb(15 23 42 / 18%);
+
+  /* ── Glassmorphism & Blur ─── */
+  --core-glass-bg: rgb(255 255 255 / 80%);
+  --core-glass-blur: blur(12px);
+  --core-glass-border: rgb(255 255 255 / 60%);
+  --core-overlay-bg: rgb(15 23 42 / 40%);
+  --core-overlay-blur: blur(4px);
+
+  /* ── Radii ─── */
   --core-radius-sm: 6px;
-  --core-radius-md: 8px;
-  --core-radius-lg: 12px;
+  --core-radius-md: 10px;
+  --core-radius-lg: 14px;
+  --core-radius-xl: 20px;
 
+  /* ── Spacing ─── */
   --core-space-1: 4px;
   --core-space-2: 8px;
   --core-space-3: 12px;
@@ -43,12 +61,20 @@
   --core-space-12: 48px;
   --core-space-16: 64px;
 
+  /* ── Typography ─── */
   --core-font-sans: Inter, "Segoe UI", Roboto, Arial, sans-serif;
   --core-text-xs: 12px;
   --core-text-sm: 14px;
-  --core-text-base: 16px;
+  --core-text-base: 15px;
   --core-text-lg: 18px;
   --core-text-xl: 20px;
   --core-text-2xl: 24px;
-  --core-text-3xl: 32px;
+  --core-text-3xl: 30px;
+
+  /* ── Transitions ─── */
+  --core-transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  --core-transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --core-transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --core-transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
