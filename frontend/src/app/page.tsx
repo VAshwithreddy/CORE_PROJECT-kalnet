@@ -1,72 +1,70 @@
-const mvpFlow = [
-  "Work admin creates a request",
-  "Request is routed to a department",
-  "Department head assigns work",
-  "Employee updates progress",
-  "Blockers and audit history are tracked",
-];
-
-const setupChecks = [
-  "Frontend app starts on localhost:3000",
-  "Backend health API responds on localhost:8000/health",
-  "Role routes exist for employee, department, work admin, executive, and system admin",
-];
-
 export default function LandingPage() {
   return (
-    <main className="core-page">
-      <div className="core-shell">
-        <header className="core-header">
-          <div>
-            <p className="core-eyebrow">CORE setup checkpoint</p>
-            <h1 className="core-title">Role-based work management starts here</h1>
-            <p className="core-description">
-              CORE is being built as an operations platform for work intake, routing, assignments,
-              blockers, approvals, audit history, and reporting. This page confirms the frontend
-              setup is ready for feature development.
-            </p>
+    <main className="landing-page">
+      {/* Navbar */}
+      <nav className="landing-navbar">
+        <div className="landing-logo">
+          <div className="landing-logo-badge">C</div>
+          <span>CORE</span>
+        </div>
+        <div className="landing-actions">
+          <a href="/login" className="core-button core-button-primary">
+            Sign In to Platform
+          </a>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <header className="landing-hero" style={{ margin: "96px auto 64px" }}>
+        <span className="landing-badge">
+          <span>✨</span> KALNET Internal Operations
+        </span>
+        <h1 className="landing-hero-title">
+          One shared source of truth for <span>who is working on what</span>.
+        </h1>
+        <p className="landing-hero-desc">
+          CORE is an operations registry connecting team assignments, project statuses,
+          blocker tracking, and AI-powered weekly digest reports into a single control pane.
+        </p>
+
+        <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+          <a href="/login" className="core-button core-button-primary" style={{ padding: "0 32px", minHeight: "48px", fontSize: "15px" }}>
+            Sign In to CORE
+          </a>
+        </div>
+      </header>
+
+      {/* Role Scopes Section */}
+      <section className="core-shell" style={{ padding: "0 24px 96px" }} aria-label="Role scopes summary">
+        <h2 className="landing-section-title">Tailored Scopes for the KALNET Team</h2>
+        <div className="role-cards-grid">
+          <div className="landing-role-card">
+            <div className="landing-role-icon" style={{ background: "var(--core-brand-soft)", color: "var(--core-brand)" }}>👩‍💻</div>
+            <h4>Team Member</h4>
+            <p>Access your personal home view to track active assignments, update task states, and request blocker relief directly.</p>
           </div>
-          <nav className="core-actions" aria-label="Primary routes">
-            <a className="core-button core-button-primary" href="/login">
-              Sign in
-            </a>
-            <a className="core-button" href="/employee/home">
-              Employee home
-            </a>
-          </nav>
-        </header>
+          <div className="landing-role-card">
+            <div className="landing-role-icon" style={{ background: "var(--core-info-soft)", color: "var(--core-info)" }}>📋</div>
+            <h4>Department Head</h4>
+            <p>Organize team members, assign projects on a visual board, generate weekly summaries, and address blocker alerts.</p>
+          </div>
+          <div className="landing-role-card">
+            <div className="landing-role-icon" style={{ background: "var(--core-executive-soft)", color: "var(--core-executive)" }}>📊</div>
+            <h4>CTO / CEO</h4>
+            <p>Check the global organization-wide roadmap view, balance capacity loads, and read AI status digests.</p>
+          </div>
+          <div className="landing-role-card">
+            <div className="landing-role-icon" style={{ background: "var(--core-warning-soft)", color: "var(--core-warning)" }}>🛡️</div>
+            <h4>Platform Admin</h4>
+            <p>Manage users, config parameters, database tables, API keys, and platform-wide security policies.</p>
+          </div>
+        </div>
+      </section>
 
-        <section className="core-grid" aria-label="CORE setup summary">
-          <article className="core-panel">
-            <span className="core-status">MVP first</span>
-            <h2>Build one working flow</h2>
-            <ul className="core-list">
-              {mvpFlow.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
-
-          <article className="core-panel">
-            <span className="core-status">Team focus</span>
-            <h2>Module ownership</h2>
-            <p>
-              Full stack developers lead frontend and backend setup. AIML members support modules,
-              data, testing, documentation, and later AI features like routing and digest generation.
-            </p>
-          </article>
-
-          <article className="core-panel">
-            <span className="core-status">Ready check</span>
-            <h2>Setup targets</h2>
-            <ul className="core-list">
-              {setupChecks.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
-        </section>
-      </div>
+      {/* Footer */}
+      <footer className="landing-footer">
+        <p>© {new Date().getFullYear()} KALNET CORE Platform. Internal & Confidential.</p>
+      </footer>
     </main>
   );
 }
