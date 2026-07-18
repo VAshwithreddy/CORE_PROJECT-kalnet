@@ -1108,6 +1108,13 @@ a.metric-card:hover {
   opacity: 1;
 }
 
+/* Touch devices: row actions are always visible (no hover state available) */
+@media (hover: none) {
+  .data-table__row-actions {
+    opacity: 1;
+  }
+}
+
 .data-table__expand-row td {
   padding: 0;
   background: var(--core-surface-muted);

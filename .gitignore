@@ -31,3 +31,5 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+frontend/playwright-report/
+frontend/test-results/
