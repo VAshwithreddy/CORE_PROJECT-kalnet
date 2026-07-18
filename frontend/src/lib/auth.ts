@@ -1,9 +1,4 @@
-export type UserRole =
-  | "employee"
-  | "department"
-  | "executive"
-  | "work-admin"
-  | "system-admin";
+import type { UserRole } from "./roles";
 
 export type AuthUser = {
   id: string;

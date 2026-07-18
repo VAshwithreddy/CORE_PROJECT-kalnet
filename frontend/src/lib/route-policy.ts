@@ -1,4 +1,4 @@
-import type { UserRole } from "./auth";
+import type { UserRole } from "./roles";
 
 export const routeAccess: Record<string, UserRole[]> = {
   "/employee": ["employee", "department", "executive", "work-admin", "system-admin"],
