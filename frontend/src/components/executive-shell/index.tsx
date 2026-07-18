@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { AppShell } from "@/components/app-shell";
+import type { NavItem } from "@/components/app-shell";
 
 interface ExecutiveShellProps {
   children: ReactNode;
-  /** Active path segment to highlight nav item. */
   activePath?: string;
   breadcrumbs?: ReactNode;
   topbarActions?: ReactNode;

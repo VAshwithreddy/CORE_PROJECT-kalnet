@@ -15,6 +15,7 @@
  */
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 interface Breadcrumb {
   label: string;
@@ -61,10 +62,10 @@ function ActionButton({ action, isPrimary }: { action: HeaderAction; isPrimary?:
 
   if (action.href) {
     return (
-      <a href={action.href} className={cls} title={action.title}>
+      <Link href={action.href} className={cls} title={action.title}>
         {action.icon && <span aria-hidden="true">{action.icon}</span>}
         {action.label}
-      </a>
+      </Link>
     );
   }
 
@@ -107,7 +108,7 @@ export function PageHeader({
                   </span>
                 )}
                 {crumb.href ? (
-                  <a href={crumb.href}>{crumb.label}</a>
+                  <Link href={crumb.href}>{crumb.label}</Link>
                 ) : (
                   <span aria-current="page">{crumb.label}</span>
                 )}
