@@ -94,6 +94,12 @@ class MeService:
         elif "title" in update_data and update_data["title"]:
             person.job_title = update_data["title"]
 
+        if "availability" in update_data and update_data["availability"] is not None:
+            person.availability = update_data["availability"]
+            
+        if "skills" in update_data and update_data["skills"] is not None:
+            person.skills = update_data["skills"]
+
         try:
             db.commit()
             db.refresh(person)

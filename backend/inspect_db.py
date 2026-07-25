@@ -45,7 +45,8 @@ try:
             ]
         }
         
-    output_path = "db_schema.json"
+    import os
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "db_schema.json")
     with open(output_path, "w") as f:
         json.dump(schema_info, f, indent=2)
         

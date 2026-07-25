@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, String, ForeignKey, Date, DateTime
+from sqlalchemy import Column, String, ForeignKey, Date, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -17,7 +17,10 @@ class Assignment(Base):
     person_id = Column(UUID(as_uuid=True), ForeignKey("people.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     role = Column(String, nullable=False)
-    status = Column(String, nullable=False, default="active")
+    status = Column(String, nullable=False, default="on_track")
+    @property
+    def allocation_percent(self) -> int:
+        return 100
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

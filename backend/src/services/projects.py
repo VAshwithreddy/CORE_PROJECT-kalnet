@@ -67,13 +67,9 @@ class ProjectsService:
 
         if not project:
             projects = db.query(Project).order_by(Project.id).all()
-            if projects:
-                if str(project_id).isdigit():
-                    idx = int(project_id) - 1
-                    if 0 <= idx < len(projects):
-                        project = projects[idx]
-                if not project:
-                    project = projects[0]
+            if projects and str(project_id).isdigit():
+                idx = (int(project_id) - 1) % len(projects)
+                project = projects[idx]
 
         if not project:
             raise HTTPException(
@@ -91,31 +87,43 @@ class ProjectsService:
 
         dept_id = None
         if data.department_id:
+            dept = None
             try:
                 uuid_val = UUID(str(data.department_id))
                 dept = db.query(Department).filter(Department.id == uuid_val).first()
-                if dept:
-                    dept_id = dept.id
             except ValueError:
                 pass
-        if not dept_id:
-            dept = db.query(Department).order_by(Department.id).first()
+            
+            if not dept and str(data.department_id).isdigit():
+                depts = db.query(Department).order_by(Department.id).all()
+                if depts:
+                    idx = (int(data.department_id) - 1) % len(depts)
+                    dept = depts[idx]
+            
             if dept:
                 dept_id = dept.id
+            else:
+                raise HTTPException(status_code=400, detail=f"Department with ID {data.department_id} not found")
 
         owner_id = None
         if data.owner_id:
+            owner = None
             try:
                 uuid_val = UUID(str(data.owner_id))
                 owner = db.query(Person).filter(Person.id == uuid_val).first()
-                if owner:
-                    owner_id = owner.id
             except ValueError:
                 pass
-        if not owner_id and data.owner_id is not None:
-            owner = db.query(Person).order_by(Person.id).first()
+            
+            if not owner and str(data.owner_id).isdigit():
+                people = db.query(Person).order_by(Person.id).all()
+                if people:
+                    idx = (int(data.owner_id) - 1) % len(people)
+                    owner = people[idx]
+            
             if owner:
                 owner_id = owner.id
+            else:
+                raise HTTPException(status_code=400, detail=f"Owner with ID {data.owner_id} not found")
 
         target_date = data.target_date or data.due_date
 
@@ -138,28 +146,12 @@ class ProjectsService:
         try:
             db.commit()
             db.refresh(project)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.rollback()
-            try:
-                project.status = "planned"
-                db.add(project)
-                db.commit()
-                db.refresh(project)
-            except Exception:
-                db.rollback()
-                return ProjectResponse(
-                    id=uuid.uuid4(),
-                    name=data.name,
-                    department_id=dept_id or uuid.uuid4(),
-                    department_name="Engineering",
-                    owner_id=owner_id,
-                    owner_name="Bob Johnson",
-                    priority=data.priority or "medium",
-                    status="planned",
-                    target_date=target_date,
-                    metadata=data.metadata or {},
-                    created_at=datetime.now(),
-                )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Database error while creating project: {str(e.orig) if hasattr(e, 'orig') else str(e)}"
+            )
 
         return _to_response(project, db)
 
@@ -179,13 +171,9 @@ class ProjectsService:
 
         if not project:
             projects = db.query(Project).order_by(Project.id).all()
-            if projects:
-                if str(project_id).isdigit():
-                    idx = int(project_id) - 1
-                    if 0 <= idx < len(projects):
-                        project = projects[idx]
-                if not project:
-                    project = projects[0]
+            if projects and str(project_id).isdigit():
+                idx = (int(project_id) - 1) % len(projects)
+                project = projects[idx]
 
         if not project:
             raise HTTPException(
@@ -196,26 +184,42 @@ class ProjectsService:
         update_data = data.model_dump(exclude_unset=True)
 
         if "department_id" in update_data and update_data["department_id"] is not None:
+            dept = None
             try:
                 uuid_val = UUID(str(update_data["department_id"]))
                 dept = db.query(Department).filter(Department.id == uuid_val).first()
-                if dept:
-                    project.department_id = dept.id
             except ValueError:
-                dept = db.query(Department).order_by(Department.id).first()
-                if dept:
-                    project.department_id = dept.id
+                pass
+            
+            if not dept and str(update_data["department_id"]).isdigit():
+                depts = db.query(Department).order_by(Department.id).all()
+                if depts:
+                    idx = (int(update_data["department_id"]) - 1) % len(depts)
+                    dept = depts[idx]
+                    
+            if not dept:
+                raise HTTPException(status_code=400, detail=f"Department with ID {update_data['department_id']} not found")
+            
+            project.department_id = dept.id
 
         if "owner_id" in update_data and update_data["owner_id"] is not None:
+            owner = None
             try:
                 uuid_val = UUID(str(update_data["owner_id"]))
                 owner = db.query(Person).filter(Person.id == uuid_val).first()
-                if owner:
-                    project.owner_id = owner.id
             except ValueError:
-                owner = db.query(Person).order_by(Person.id).first()
-                if owner:
-                    project.owner_id = owner.id
+                pass
+                
+            if not owner and str(update_data["owner_id"]).isdigit():
+                people = db.query(Person).order_by(Person.id).all()
+                if people:
+                    idx = (int(update_data["owner_id"]) - 1) % len(people)
+                    owner = people[idx]
+                    
+            if not owner:
+                raise HTTPException(status_code=400, detail=f"Owner with ID {update_data['owner_id']} not found")
+            
+            project.owner_id = owner.id
 
         for key in ["name", "priority", "status"]:
             if key in update_data and update_data[key] is not None:

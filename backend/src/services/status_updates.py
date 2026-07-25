@@ -46,13 +46,9 @@ class StatusUpdatesService:
 
         if not assignment:
             assignments = db.query(Assignment).order_by(Assignment.id).all()
-            if assignments:
-                if str(assignment_id).isdigit():
-                    idx = int(assignment_id) - 1
-                    if 0 <= idx < len(assignments):
-                        assignment = assignments[idx]
-                if not assignment:
-                    assignment = assignments[0]
+            if assignments and str(assignment_id).isdigit():
+                idx = (int(assignment_id) - 1) % len(assignments)
+                assignment = assignments[idx]
 
         if not assignment:
             raise HTTPException(
@@ -67,20 +63,17 @@ class StatusUpdatesService:
                 author = db.query(Person).filter(Person.id == uuid_val).first()
             except ValueError:
                 pass
-        if not author:
-            people = db.query(Person).order_by(Person.id).all()
-            if people:
-                if str(data.author_id).isdigit():
-                    idx = int(data.author_id) - 1
-                    if 0 <= idx < len(people):
-                        author = people[idx]
-                if not author:
-                    author = people[0]
+                
+            if not author and str(data.author_id).isdigit():
+                people = db.query(Person).order_by(Person.id).all()
+                idx = int(data.author_id) - 1
+                if 0 <= idx < len(people):
+                    author = people[idx]
 
         if not author:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Author not found.",
+                detail=f"Author with ID {data.author_id} not found.",
             )
 
         status_str = data.status.value if hasattr(data.status, "value") else str(data.status)

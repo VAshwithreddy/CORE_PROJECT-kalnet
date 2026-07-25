@@ -16,6 +16,9 @@ class Settings:
     environment: str
     allowed_origins: list[str]
     database_url: str
+    secret_key: str
+    access_token_expire_minutes: int
+    refresh_token_expire_days: int
 
 def load_settings() -> Settings:
     return Settings(
@@ -23,6 +26,9 @@ def load_settings() -> Settings:
         environment=os.getenv("CORE_ENV", "development"),
         allowed_origins=_csv_env("CORE_ALLOWED_ORIGINS", "http://localhost:3000"),
         database_url=os.getenv("DATABASE_URL", ""),
+        secret_key=os.getenv("SECRET_KEY", "insecure-default-secret-key"),
+        access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
+        refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
     )
 
 settings = load_settings()
