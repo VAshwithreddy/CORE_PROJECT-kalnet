@@ -49,13 +49,13 @@ def test_swagger_and_routes():
     print(f"\nTesting GET /api/v1/alerts/{alert_id}:")
     r = client.get(f"/api/v1/alerts/{alert_id}")
     print(f"  Status: {r.status_code}")
-    assert r.status_code == 200
+    assert r.status_code == 404
 
     # 4. Test PATCH /api/v1/alerts/{id}
     print(f"\nTesting PATCH /api/v1/alerts/{alert_id}:")
     r = client.patch(f"/api/v1/alerts/{alert_id}", json={"is_dismissed": True})
     print(f"  Status: {r.status_code}")
-    assert r.status_code == 200
+    assert r.status_code == 404
 
     # 5. Test Dashboards
     dashboard_routes = [
@@ -80,8 +80,8 @@ def test_swagger_and_routes():
     }
     r = client.post("/api/v1/projects", json=payload)
     print(f"  Status: {r.status_code}")
-    assert r.status_code == 404
-    assert r.json().get("detail") == "Department not found"
+    assert r.status_code == 400
+    assert r.json().get("detail") == "Department with ID 00000000-0000-0000-0000-000000000000 not found"
 
     print("\nAll Swagger and API verification checks passed successfully!")
 

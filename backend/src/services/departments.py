@@ -59,13 +59,9 @@ class DepartmentsService:
 
         if not department:
             depts = db.query(Department).order_by(Department.id).all()
-            if depts:
-                if str(department_id).isdigit():
-                    idx = int(department_id) - 1
-                    if 0 <= idx < len(depts):
-                        department = depts[idx]
-                if not department:
-                    department = depts[0]
+            if depts and str(department_id).isdigit():
+                idx = (int(department_id) - 1) % len(depts)
+                department = depts[idx]
 
         if not department:
             raise HTTPException(

@@ -42,6 +42,12 @@ logger = logging.getLogger("core_api")
 # ── Application factory ───────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
+    from src.core.database import init_db
+    try:
+        init_db()
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+
     app = FastAPI(
         title="CORE API",
         description=(

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Boolean, DateTime, Text
+from sqlalchemy import Column, String, ForeignKey, Boolean, DateTime, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -12,12 +12,33 @@ class StalenessAlert(Base):
     __tablename__ = "staleness_alerts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    type = Column(String, nullable=False, default="stale_assignment")
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    assignment_id = Column(UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    is_dismissed = Column(Boolean, nullable=False, default=False)
+    assignment_id = Column(UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False)
+    severity = Column(String, nullable=False, default="low")
+    reason = Column(Text, nullable=False)
+    days_since_update = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default="open")
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    @property
+    def is_dismissed(self) -> bool:
+        return self.status != "open"
+        
+    @is_dismissed.setter
+    def is_dismissed(self, value: bool):
+        self.status = "resolved" if value else "open"
+
+    @property
+    def title(self) -> str:
+        return f"Stale Assignment ({self.severity} severity)"
+        
+    @property
+    def description(self) -> str:
+        return self.reason
+
+    @property
+    def type(self) -> str:
+        return "stale_assignment"
 
     # Relationships
     assignment = relationship("Assignment", lazy="select")

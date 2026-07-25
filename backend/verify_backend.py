@@ -8,7 +8,7 @@ def verify():
     report.append("# Backend Verification Report")
     
     # Check if folder structure exists
-    folders = ["api", "schemas", "services", "dummy_data", "core"]
+    folders = ["api", "schemas", "services", "core"]
     for folder in folders:
         path = os.path.join(src_dir, folder)
         if os.path.exists(path):
@@ -34,16 +34,13 @@ def verify():
                     else:
                         report.append(f"- [ ] Router for `{router}` NOT FOUND in routes.py.")
     
-    # Check if all modules have their 4 files (api, schemas, services, dummy_data)
+    # Check if all modules have their 3 files (api, schemas, services)
     modules = ["health", "me", "people", "departments", "projects", "assignments", "status_updates", "dashboards", "digests", "alerts", "system"]
     
     report.append("\n## Module Files")
     for mod in modules:
-        for layer in ["api", "schemas", "services", "dummy_data"]:
+        for layer in ["api", "schemas", "services"]:
             fpath = os.path.join(src_dir, layer, f"{mod}.py")
-            if layer == "dummy_data" and mod in ["health", "me"]:
-                # health and me might not have dummy data files
-                continue
             if os.path.exists(fpath):
                 # basic check for content
                 with open(fpath, "r") as f:

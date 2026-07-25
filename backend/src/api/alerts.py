@@ -3,6 +3,9 @@ from fastapi import APIRouter, status
 from typing import List
 from src.schemas.alerts import AlertResponse, AlertUpdate
 from src.services.alerts import AlertsService
+from src.core.database import get_db
+from sqlalchemy.orm import Session
+from fastapi import Depends
 
 router = APIRouter()
 
@@ -12,12 +15,12 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     tags=["alerts"]
 )
-def get_stale_alerts() -> List[AlertResponse]:
+def get_stale_alerts(db: Session = Depends(get_db)) -> List[AlertResponse]:
     """
     Retrieve a list of stale alerts.
     These are assignments that haven't received a status update in a defined period (e.g., 7 days).
     """
-    return AlertsService.get_stale_alerts()
+    return AlertsService.get_stale_alerts(db)
 
 @router.get(
     "/{id}",
@@ -25,11 +28,11 @@ def get_stale_alerts() -> List[AlertResponse]:
     status_code=status.HTTP_200_OK,
     tags=["alerts"]
 )
-def get_alert_by_id(id: str) -> AlertResponse:
+def get_alert_by_id(id: str, db: Session = Depends(get_db)) -> AlertResponse:
     """
     Retrieve a single alert by its ID.
     """
-    return AlertsService.get_alert_by_id(id)
+    return AlertsService.get_alert_by_id(id, db)
 
 @router.patch(
     "/{id}",
@@ -37,10 +40,10 @@ def get_alert_by_id(id: str) -> AlertResponse:
     status_code=status.HTTP_200_OK,
     tags=["alerts"]
 )
-def update_alert(id: str, update_data: AlertUpdate) -> AlertResponse:
+def update_alert(id: str, update_data: AlertUpdate, db: Session = Depends(get_db)) -> AlertResponse:
     """
     Update an alert (e.g., mark it as dismissed).
     """
-    return AlertsService.update_alert(id, update_data)
+    return AlertsService.update_alert(id, update_data, db)
 
 

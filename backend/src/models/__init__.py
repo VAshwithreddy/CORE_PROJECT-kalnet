@@ -15,6 +15,7 @@ from src.models.staleness_alert import StalenessAlert
 from src.models.approval_request import ApprovalRequest
 from src.models.notification import Notification
 from src.models.audit_log import AuditLog
+from src.models.service_account import ServiceAccount
 
 __all__ = [
     "Department",
@@ -27,4 +28,5 @@ __all__ = [
     "ApprovalRequest",
     "Notification",
     "AuditLog",
+    "ServiceAccount",
 ]

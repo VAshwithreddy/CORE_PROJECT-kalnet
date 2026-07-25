@@ -52,15 +52,11 @@ class PeopleService:
             pass
 
         if not person:
-            # Fallback: if numeric ID like "1", look up by offset or string match
             people = db.query(Person).order_by(Person.id).all()
-            if people:
-                if str(person_id).isdigit():
-                    idx = int(person_id) - 1
-                    if 0 <= idx < len(people):
-                        person = people[idx]
-                if not person:
-                    person = people[0]
+            if people and str(person_id).isdigit():
+                idx = int(person_id) - 1
+                if 0 <= idx < len(people):
+                    person = people[idx]
 
         if not person:
             raise HTTPException(
