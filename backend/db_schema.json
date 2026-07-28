@@ -1,0 +1,767 @@
+{
+  "departments": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "head_person_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "head_person_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "people": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "auth_user_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "full_name",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "email",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "role",
+        "type": "VARCHAR(15)",
+        "nullable": false,
+        "default": "'employee'::person_role"
+      },
+      {
+        "name": "department_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "job_title",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "manager_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "skills",
+        "type": "ARRAY",
+        "nullable": true,
+        "default": "'{}'::text[]"
+      },
+      {
+        "name": "availability",
+        "type": "VARCHAR(19)",
+        "nullable": false,
+        "default": "'available'::availability_status"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "auth_user_id"
+        ],
+        "referred_table": "users",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "department_id"
+        ],
+        "referred_table": "departments",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "manager_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "projects": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "department_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "owner_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "priority",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": "'medium'::project_priority"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(9)",
+        "nullable": false,
+        "default": "'planned'::project_status"
+      },
+      {
+        "name": "target_date",
+        "type": "DATE",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata",
+        "type": "JSONB",
+        "nullable": false,
+        "default": "'{}'::jsonb"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "department_id"
+        ],
+        "referred_table": "departments",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "owner_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "assignments": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "person_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "project_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "role",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": "'on_track'::assignment_status"
+      },
+      {
+        "name": "start_date",
+        "type": "DATE",
+        "nullable": false,
+        "default": "CURRENT_DATE"
+      },
+      {
+        "name": "end_date",
+        "type": "DATE",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "updated_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "person_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "project_id"
+        ],
+        "referred_table": "projects",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "status_updates": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "assignment_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "author_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "progress_note",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "blockers",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_url",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "assignment_id"
+        ],
+        "referred_table": "assignments",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "author_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "weekly_digests": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "department_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "week_start",
+        "type": "DATE",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "week_end",
+        "type": "DATE",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "summary",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "generated_by",
+        "type": "TEXT",
+        "nullable": false,
+        "default": "'ai_agent'::text"
+      },
+      {
+        "name": "model_version",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reviewed_by",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "review_status",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": "'pending'::digest_review_status"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "department_id"
+        ],
+        "referred_table": "departments",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "reviewed_by"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "staleness_alerts": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "assignment_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "severity",
+        "type": "VARCHAR(6)",
+        "nullable": false,
+        "default": "'low'::alert_severity"
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "days_since_update",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": "'open'::alert_status"
+      },
+      {
+        "name": "resolved_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "assignment_id"
+        ],
+        "referred_table": "assignments",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "approval_requests": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "requested_by",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "request_type",
+        "type": "VARCHAR(17)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "target_entity",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "target_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "payload",
+        "type": "JSONB",
+        "nullable": false,
+        "default": "'{}'::jsonb"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(8)",
+        "nullable": false,
+        "default": "'pending'::approval_status"
+      },
+      {
+        "name": "approved_by",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      },
+      {
+        "name": "resolved_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "approved_by"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      },
+      {
+        "constrained_columns": [
+          "requested_by"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "notifications": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "recipient_id",
+        "type": "UUID",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "action_url",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_read",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "false"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "recipient_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "audit_logs": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "UUID",
+        "nullable": false,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "actor_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "action",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "entity",
+        "type": "TEXT",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "entity_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "before_state",
+        "type": "JSONB",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "after_state",
+        "type": "JSONB",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "request_id",
+        "type": "UUID",
+        "nullable": true,
+        "default": "gen_random_uuid()"
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": false,
+        "default": "now()"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "constrained_columns": [
+          "actor_id"
+        ],
+        "referred_table": "people",
+        "referred_columns": [
+          "id"
+        ]
+      }
+    ]
+  }
+}
