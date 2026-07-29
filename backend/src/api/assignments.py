@@ -4,22 +4,36 @@ from typing import List
 from uuid import UUID
 from sqlalchemy.orm import Session
 from src.core.database import get_db
+from src.core.dependencies import get_current_user, CurrentUser
 from src.schemas.assignments import AssignmentResponse, AssignmentCreate, AssignmentUpdate
 from src.services.assignments import AssignmentsService
 
 router = APIRouter()
 
+# Roles that may see ALL assignments across the organisation.
+_PRIVILEGED_ROLES = {"department_head", "executive", "work_admin", "system_admin"}
 
-@router.get("", response_model=List[AssignmentResponse], tags=["assignments"])
-def get_all_assignments(db: Session = Depends(get_db)) -> List[AssignmentResponse]:
+
+@router.get("", response_model=List[AssignmentResponse])
+def get_all_assignments(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> List[AssignmentResponse]:
     """
-    Retrieve a list of all assignments in the system.
-    Returns full details including project, assignee, role, status, and allocation.
+    Retrieve assignments visible to the caller.
+
+    - **Employees** (`role == employee`) only see their own assignments.
+    - **Privileged roles** (department_head, executive, work_admin, system_admin)
+      see every assignment in the system.
     """
-    return AssignmentsService.get_all_assignments(db)
+    if current_user.role in _PRIVILEGED_ROLES:
+        return AssignmentsService.get_all_assignments(db)
+
+    # Employee — restrict to their own person_id
+    return AssignmentsService.get_assignments_for_person(db, current_user.person_id)
 
 
-@router.get("/{assignment_id}", response_model=AssignmentResponse, tags=["assignments"])
+@router.get("/{assignment_id}", response_model=AssignmentResponse)
 def get_assignment_by_id(assignment_id: str, db: Session = Depends(get_db)) -> AssignmentResponse:
     """
     Retrieve a single assignment by its ID.
@@ -45,7 +59,7 @@ def get_assignment_by_id(assignment_id: str, db: Session = Depends(get_db)) -> A
     return AssignmentsService._to_response(assignment, db)
 
 
-@router.post("", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED, tags=["assignments"])
+@router.post("", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
 def create_assignment(
     assignment_data: AssignmentCreate, db: Session = Depends(get_db)
 ) -> AssignmentResponse:
@@ -58,7 +72,7 @@ def create_assignment(
     return AssignmentsService.create_assignment(assignment_data, db)
 
 
-@router.patch("/{assignment_id}", response_model=AssignmentResponse, tags=["assignments"])
+@router.patch("/{assignment_id}", response_model=AssignmentResponse)
 def update_assignment(
     assignment_id: str, assignment_data: AssignmentUpdate, db: Session = Depends(get_db)
 ) -> AssignmentResponse:

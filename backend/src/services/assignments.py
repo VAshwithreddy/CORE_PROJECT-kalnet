@@ -61,6 +61,19 @@ class AssignmentsService:
         return [AssignmentsService._to_response(a, db) for a in assignments]
 
     @staticmethod
+    def get_assignments_for_person(db: Session, person_id) -> List[AssignmentResponse]:
+        """Return only the assignments that belong to a specific person.
+
+        Used to enforce the employee-scoping rule: an employee may only see
+        their own assignments, never another person's.
+        """
+        from uuid import UUID as _UUID
+        if not isinstance(person_id, _UUID):
+            person_id = _UUID(str(person_id))
+        assignments = db.query(Assignment).filter(Assignment.person_id == person_id).all()
+        return [AssignmentsService._to_response(a, db) for a in assignments]
+
+    @staticmethod
     def create_assignment(data: AssignmentCreate, db: Session) -> AssignmentResponse:
         """Create a new assignment after validating related entities."""
         project_uuid = None

@@ -9,9 +9,64 @@
       "key": "base_url",
       "value": "http://localhost:8000/api/v1",
       "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auth_username",
+      "value": "arjun.sharma@kalnet.com",
+      "description": "Login as a privileged user so all collection tests pass. Change to any valid email.",
+      "type": "string"
     }
   ],
   "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login (saves token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login returns 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', json.access_token);",
+                  "    console.log('Token saved:', json.access_token.substring(0, 30) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{auth_username}}\",\n  \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "1. Health",
       "item": [
@@ -376,7 +431,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/assignments",
               "host": ["{{base_url}}"],
