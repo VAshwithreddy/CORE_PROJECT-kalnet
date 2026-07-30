@@ -5,6 +5,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
+from src.core.dependencies import CurrentUser
+
 from src.models.project import Project
 from src.models.department import Department
 from src.models.person import Person
@@ -57,7 +59,33 @@ class ProjectsService:
         return [_to_response(project, db) for project in projects]
 
     @staticmethod
-    def get_project_by_id(project_id: str, db: Session) -> ProjectResponse:
+    def get_visible_projects(db: Session, current_user: CurrentUser) -> List[ProjectResponse]:
+        """
+        Returns only the projects visible to the current user.
+        - Privileged roles see all projects.
+        - Other roles see projects where they or their visible people are assigned.
+        """
+        from src.core.rbac import RBACService, PRIVILEGED_ROLES
+        from src.models.assignment import Assignment
+
+        if current_user.role in PRIVILEGED_ROLES:
+            projects = db.query(Project).all()
+        else:
+            visible_person_ids = RBACService.get_visible_person_ids(db, current_user)
+            project_ids = (
+                db.query(Assignment.project_id)
+                .filter(Assignment.person_id.in_(visible_person_ids))
+                .distinct()
+                .all()
+            )
+            # project_ids is a list of tuples like [(uuid1,), (uuid2,)]
+            pid_list = [p[0] for p in project_ids if p[0] is not None]
+            projects = db.query(Project).filter(Project.id.in_(pid_list)).all()
+
+        return [_to_response(project, db) for project in projects]
+
+    @staticmethod
+    def get_project_by_id(project_id: str, db: Session, current_user: CurrentUser) -> ProjectResponse:
         project = None
         try:
             uuid_val = UUID(str(project_id))
@@ -76,6 +104,24 @@ class ProjectsService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project with ID {project_id} not found",
             )
+
+        # Enforce RBAC
+        from src.core.rbac import RBACService, PRIVILEGED_ROLES
+        from src.models.assignment import Assignment
+        
+        if current_user.role not in PRIVILEGED_ROLES:
+            visible_person_ids = RBACService.get_visible_person_ids(db, current_user)
+            # Check if any visible person is assigned to this project
+            has_access = db.query(Assignment).filter(
+                Assignment.project_id == project.id,
+                Assignment.person_id.in_(visible_person_ids)
+            ).first() is not None
+            
+            if not has_access:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have permission to view this project."
+                )
 
         return _to_response(project, db)
 

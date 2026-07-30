@@ -7,10 +7,7 @@ from src.core.database import get_db
 from src.models.person import Person
 from src.models.department import Department
 from src.schemas.me import UserResponse, UserProfileResponse, UserProfileUpdate
-
-# Placeholder current‑user UUID – replace with real JWT auth later.
 from uuid import UUID
-_CURRENT_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 class MeService:
@@ -20,23 +17,20 @@ class MeService:
     """
 
     @staticmethod
-    def _get_person(db: Session, person_id: UUID = _CURRENT_USER_ID) -> Person:
+    def _get_person(db: Session, person_id: UUID) -> Person:
         """Fetch the Person row for the current user; raise 404 if missing."""
         person = db.query(Person).filter(Person.id == person_id).first()
         if not person:
-            # Fallback: try to fetch any existing user (first record)
-            person = db.query(Person).order_by(Person.id).first()
-            if not person:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Current user (Person ID {person_id}) not found, and no users exist in database.",
-                )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Current user (Person ID {person_id}) not found in database.",
+            )
         return person
 
     @staticmethod
-    def get_basic_info(db: Session) -> UserResponse:
+    def get_basic_info(db: Session, person_id: UUID) -> UserResponse:
         """Return minimal user info: id, username (email prefix), email, role."""
-        person = MeService._get_person(db)
+        person = MeService._get_person(db, person_id)
         username = person.email.split("@")[0] if person.email else f"user_{person.id}"
         return UserResponse(
             id=person.id,
@@ -46,9 +40,9 @@ class MeService:
         )
 
     @staticmethod
-    def get_profile(db: Session) -> UserProfileResponse:
+    def get_profile(db: Session, person_id: UUID) -> UserProfileResponse:
         """Return the detailed profile: name, title, department, bio."""
-        person = MeService._get_person(db)
+        person = MeService._get_person(db, person_id)
 
         dept_name = ""
         if person.department_id:
@@ -70,7 +64,7 @@ class MeService:
         )
 
     @staticmethod
-    def update_profile(update_data: Dict[str, Any], db: Session) -> UserProfileResponse:
+    def update_profile(update_data: Dict[str, Any], db: Session, person_id: UUID) -> UserProfileResponse:
         """Partially update the current user's editable profile fields."""
         if not update_data:
             raise HTTPException(
@@ -78,7 +72,7 @@ class MeService:
                 detail="No valid fields provided for update.",
             )
 
-        person = MeService._get_person(db)
+        person = MeService._get_person(db, person_id)
 
         if "first_name" in update_data or "last_name" in update_data:
             name_parts = (person.full_name or "").split()
@@ -128,3 +122,4 @@ class MeService:
             title=title,
             bio=None,
         )
+

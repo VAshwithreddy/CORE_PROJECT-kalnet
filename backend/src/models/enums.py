@@ -2,6 +2,8 @@ import enum
 
 class Role(str, enum.Enum):
     employee = "employee"
+    manager = "manager"
+    team_leader = "team_leader"
     department_head = "department_head"
     executive = "executive"
     work_admin = "work_admin"
