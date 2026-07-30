@@ -12,6 +12,7 @@ from src.models.status_update import StatusUpdate
 from src.models.person import Person
 from src.models.department import Department
 from src.models.staleness_alert import StalenessAlert
+from src.core.dependencies import CurrentUser
 
 from src.schemas.dashboards import (
     EmployeeDashboardResponse,
@@ -21,28 +22,14 @@ from src.schemas.dashboards import (
 )
 
 
-def _get_current_user(db: Session) -> Person:
-    """
-    Return the 'current' user for demo purposes.
-    In production this would be decoded from the JWT in the request.
-    Falls back to the first person in the DB if the placeholder UUID is absent.
-    """
-    from uuid import UUID
-    _CURRENT_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
-    user = db.query(Person).filter(Person.id == _CURRENT_USER_ID).first()
-    if not user:
-        user = db.query(Person).order_by(Person.created_at).first()
-    return user
-
-
 class DashboardsService:
     """Business logic for the Dashboards module — fully backed by live DB queries."""
 
     # ── Employee Dashboard ────────────────────────────────────────────────────
 
     @staticmethod
-    def get_employee_dashboard(db: Session) -> EmployeeDashboardResponse:
-        user = _get_current_user(db)
+    def get_employee_dashboard(db: Session, current_user: CurrentUser) -> EmployeeDashboardResponse:
+        user = db.query(Person).filter(Person.id == current_user.person_id).first()
         if not user:
             # No users in DB at all — return empty shell
             from uuid import uuid4

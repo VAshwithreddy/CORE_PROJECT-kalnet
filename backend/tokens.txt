@@ -1,0 +1,10 @@
+--- EMPLOYEE (sara.iqbal@kalnet.demo) ---
+eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMjIyMjIyMjItMjIyMi0yMjIyLTIyMjItMjIyMjIyMjIyMjAzIiwgImVtYWlsIjogInNhcmEuaXFiYWxAa2FsbmV0LmRlbW8iLCAicm9sZSI6ICJlbXBsb3llZSIsICJleHAiOiAxNzg1NDgxOTM2fQ.Bped-TkcT_CmklWsJBLWRA6seJh4GRwQbE1TtiM1fds
+
+[!] No user with role='manager' in DB — skipping.
+[!] No user with role='team_leader' in DB — skipping.
+--- DEPARTMENT_HEAD (kabir.anand@kalnet.demo) ---
+eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMjIyMjIyMjItMjIyMi0yMjIyLTIyMjItMjIyMjIyMjIyMjA2IiwgImVtYWlsIjogImthYmlyLmFuYW5kQGthbG5ldC5kZW1vIiwgInJvbGUiOiAiZGVwYXJ0bWVudF9oZWFkIiwgImV4cCI6IDE3ODU0ODE5MzZ9.mAzZMn2LFj9KBV-gXivk-VSnWzEoEElPMg7sXZRG9c8
+
+--- EXECUTIVE (rishav.raj@kalnet.demo) ---
+eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMjIyMjIyMjItMjIyMi0yMjIyLTIyMjItMjIyMjIyMjIyMjE0IiwgImVtYWlsIjogInJpc2hhdi5yYWpAa2FsbmV0LmRlbW8iLCAicm9sZSI6ICJleGVjdXRpdmUiLCAiZXhwIjogMTc4NTQ4MTkzNn0.ndRC1KFHTrqX_ZPY__nzXJsUJ2x7eqCefMe4R2d-fxU

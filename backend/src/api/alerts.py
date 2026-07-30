@@ -1,11 +1,11 @@
-from uuid import UUID
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from typing import List
+from sqlalchemy.orm import Session
+from src.core.database import get_db, get_rls_db_for
+from src.core.dependencies import get_current_user, CurrentUser, require_roles
+from src.core.rbac import PRIVILEGED_ROLES
 from src.schemas.alerts import AlertResponse, AlertUpdate
 from src.services.alerts import AlertsService
-from src.core.database import get_db
-from sqlalchemy.orm import Session
-from fastapi import Depends
 
 router = APIRouter()
 
@@ -13,9 +13,12 @@ router = APIRouter()
     "/stale",
     response_model=List[AlertResponse],
     status_code=status.HTTP_200_OK,
-    tags=["alerts"]
+    tags=["alerts"],
+    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
-def get_stale_alerts(db: Session = Depends(get_db)) -> List[AlertResponse]:
+def get_stale_alerts(
+    db: Session = Depends(get_rls_db_for(get_current_user))
+) -> List[AlertResponse]:
     """
     Retrieve a list of stale alerts.
     These are assignments that haven't received a status update in a defined period (e.g., 7 days).
@@ -26,9 +29,13 @@ def get_stale_alerts(db: Session = Depends(get_db)) -> List[AlertResponse]:
     "/{id}",
     response_model=AlertResponse,
     status_code=status.HTTP_200_OK,
-    tags=["alerts"]
+    tags=["alerts"],
+    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
-def get_alert_by_id(id: str, db: Session = Depends(get_db)) -> AlertResponse:
+def get_alert_by_id(
+    id: str, 
+    db: Session = Depends(get_rls_db_for(get_current_user))
+) -> AlertResponse:
     """
     Retrieve a single alert by its ID.
     """
@@ -38,12 +45,15 @@ def get_alert_by_id(id: str, db: Session = Depends(get_db)) -> AlertResponse:
     "/{id}",
     response_model=AlertResponse,
     status_code=status.HTTP_200_OK,
-    tags=["alerts"]
+    tags=["alerts"],
+    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
-def update_alert(id: str, update_data: AlertUpdate, db: Session = Depends(get_db)) -> AlertResponse:
+def update_alert(
+    id: str, 
+    update_data: AlertUpdate, 
+    db: Session = Depends(get_rls_db_for(get_current_user))
+) -> AlertResponse:
     """
     Update an alert (e.g., mark it as dismissed).
     """
     return AlertsService.update_alert(id, update_data, db)
-
-

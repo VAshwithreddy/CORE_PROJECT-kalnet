@@ -4,9 +4,9 @@ import logging
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
 
 # Load .env file
 load_dotenv()
@@ -152,3 +152,48 @@ def get_db():
 
     finally:
         db.close()
+
+
+def get_rls_db_for(current_user_dep):
+    """
+    Dependency factory: wraps ``get_db`` and injects RLS session variables.
+
+    Calling ``set_config('app.current_user_id', ...)`` / ``app.current_user_role``
+    means every PostgreSQL RLS policy in the same transaction can read the
+    authenticated caller's identity via ``current_setting('app.current_user_id')``.
+
+    Example::
+
+        @router.get("/protected")
+        def endpoint(
+            db: Session = Depends(get_rls_db_for(get_current_user)),
+            current_user: CurrentUser = Depends(get_current_user),
+        ): ...
+    """
+    import sqlalchemy
+
+    def _get_db_with_rls(
+        db: Session = Depends(get_db),
+        current_user=Depends(current_user_dep),
+    ) -> Session:
+        try:
+            # Set session-local config values consumed by PostgreSQL RLS policies.
+            db.execute(
+                sqlalchemy.text(
+                    "SELECT set_config('app.current_user_id', :uid, true), "
+                    "       set_config('app.current_user_role', :role, true)"
+                ),
+                {
+                    "uid": str(current_user.person_id),
+                    "role": str(current_user.role),
+                },
+            )
+        except Exception:
+            # If session-variable setting fails (e.g. read-only replica) we log
+            # but do NOT block the request — the application-layer RBAC still runs.
+            logger.warning(
+                "Could not set RLS session variables; falling back to app-layer RBAC only."
+            )
+        return db
+
+    return _get_db_with_rls

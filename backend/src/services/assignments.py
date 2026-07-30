@@ -74,6 +74,12 @@ class AssignmentsService:
         return [AssignmentsService._to_response(a, db) for a in assignments]
 
     @staticmethod
+    def get_assignments_for_visible_persons(db: Session, visible_ids: List[UUID]) -> List[AssignmentResponse]:
+        """Return only the assignments for the visible set of persons."""
+        assignments = db.query(Assignment).filter(Assignment.person_id.in_(visible_ids)).all()
+        return [AssignmentsService._to_response(a, db) for a in assignments]
+
+    @staticmethod
     def create_assignment(data: AssignmentCreate, db: Session) -> AssignmentResponse:
         """Create a new assignment after validating related entities."""
         project_uuid = None
