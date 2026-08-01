@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExecutiveShell } from "@/components/executive-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
@@ -34,157 +34,57 @@ const SearchIcon = () => (
 interface Department {
   id: string;
   name: string;
-  unit: string;
+  description: string;
   head: string;
   headcount: number;
   activeProjects: number;
   blockers: number;
-  budgetVariance: string;
-  budgetVarianceNum: number; // positive is over, negative is under
-  completionRate: string;
-  completionRateNum: number;
   health: "Healthy" | "Attention" | "Critical";
   projects: string[];
 }
 
 export default function ExecutiveDepartmentsPage() {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [unitFilter, setUnitFilter] = useState("All");
 
-  const departments: Department[] = [
-    {
-      id: "dept-eng",
-      name: "Engineering",
-      unit: "Product Development",
-      head: "David L.",
-      headcount: 45,
-      activeProjects: 12,
-      blockers: 2,
-      budgetVariance: "-1.2%",
-      budgetVarianceNum: -1.2,
-      completionRate: "84%",
-      completionRateNum: 84,
-      health: "Healthy",
-      projects: ["Cloud Migration", "Cost Reduction", "API Gateway v2", "Database Sharding"]
-    },
-    {
-      id: "dept-ai",
-      name: "AI/ML Research",
-      unit: "Product Development",
-      head: "Sarah W.",
-      headcount: 24,
-      activeProjects: 8,
-      blockers: 4,
-      budgetVariance: "+4.5%",
-      budgetVarianceNum: 4.5,
-      completionRate: "72%",
-      completionRateNum: 72,
-      health: "Attention",
-      projects: ["AI Integration", "Agent Engine Core", "Semantic Search Optimization"]
-    },
-    {
-      id: "dept-prod",
-      name: "Product Management",
-      unit: "Product Development",
-      head: "Michael K.",
-      headcount: 12,
-      activeProjects: 6,
-      blockers: 1,
-      budgetVariance: "-0.5%",
-      budgetVarianceNum: -0.5,
-      completionRate: "90%",
-      completionRateNum: 90,
-      health: "Healthy",
-      projects: ["EMEA Strategy", "Intake Workflow Engine", "Role Matrix Planner"]
-    },
-    {
-      id: "dept-design",
-      name: "Design & UX",
-      unit: "Product Development",
-      head: "Elena R.",
-      headcount: 18,
-      activeProjects: 9,
-      blockers: 0,
-      budgetVariance: "+1.0%",
-      budgetVarianceNum: 1.0,
-      completionRate: "88%",
-      completionRateNum: 88,
-      health: "Healthy",
-      projects: ["Design Tokens Migration", "Accessibility Audit Phase 1"]
-    },
-    {
-      id: "dept-sales",
-      name: "Sales & Marketing",
-      unit: "Go-To-Market",
-      head: "Jessica T.",
-      headcount: 32,
-      activeProjects: 14,
-      blockers: 3,
-      budgetVariance: "-2.0%",
-      budgetVarianceNum: -2.0,
-      completionRate: "81%",
-      completionRateNum: 81,
-      health: "Attention",
-      projects: ["EMEA Launch", "Enterprise Beta Program", "Customer Success System"]
-    },
-    {
-      id: "dept-ops",
-      name: "IT Operations",
-      unit: "Go-To-Market",
-      head: "Marcus V.",
-      headcount: 15,
-      activeProjects: 5,
-      blockers: 3,
-      budgetVariance: "+7.2%",
-      budgetVarianceNum: 7.2,
-      completionRate: "60%",
-      completionRateNum: 60,
-      health: "Critical",
-      projects: ["SLA Monitoring Setup", "Hardware Upgrade", "Workspace Setup Automation"]
-    }
-  ];
+  // Fetch departments data
+  useEffect(() => {
+    setLoading(true);
+    fetch("/executive/api?action=departments")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch departments data");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setDepartments(data);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   // Filtering
   const filteredDepartments = departments.filter((dept) => {
-    const matchesSearch = dept.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          dept.head.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesUnit = unitFilter === "All" || dept.unit === unitFilter;
-    return matchesSearch && matchesUnit;
+    return dept.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           dept.head.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const columns: DataTableColumn<Department>[] = [
     { key: "name", header: "Department", sortable: true },
-    { key: "unit", header: "Business Unit", sortable: true },
     { key: "head", header: "Department Head", sortable: true },
     { key: "headcount", header: "Headcount", sortable: true },
-    { key: "activeProjects", header: "Active Projects", sortable: true },
-    { key: "blockers", header: "Blockers", sortable: true },
-    {
-      key: "budgetVariance",
-      header: "Budget Variance",
-      sortable: true,
-      render: (row) => {
-        const isOver = row.budgetVarianceNum > 0;
-        const color = isOver ? "var(--core-warning)" : "var(--core-success)";
-        return <span style={{ color, fontWeight: 600 }}>{row.budgetVariance}</span>;
-      }
-    },
-    {
-      key: "completionRate",
-      header: "Project Completion",
-      sortable: true,
-      render: (row) => {
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 600 }}>{row.completionRate}</span>
-            <div style={{ flex: 1, minWidth: 60, height: 6, background: "var(--core-surface-muted)", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ width: row.completionRate, height: "100%", background: "var(--core-executive)" }} />
-            </div>
-          </div>
-        );
-      }
-    },
+    { key: "activeProjects", header: "Total Projects", sortable: true },
+    { key: "blockers", header: "Active Blockers", sortable: true },
     {
       key: "health",
       header: "Health Status",
@@ -223,82 +123,101 @@ export default function ExecutiveDepartmentsPage() {
     }
   ];
 
+  if (loading) {
+    return (
+      <ExecutiveShell activePath="/executive/departments">
+        <PageHeader title="Departmental Performance" description="Connecting to live database..." />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+          <div style={{ width: "30px", height: "30px", border: "3px solid var(--core-border)", borderTop: "3px solid var(--core-executive)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExecutiveShell activePath="/executive/departments">
+        <PageHeader title="Departmental Performance" description="Connection Error" />
+        <div className="core-panel" style={{ border: "1px solid var(--core-danger)", background: "var(--core-danger-soft)", color: "var(--core-danger)", padding: 20 }}>
+          <h2 style={{ color: "var(--core-danger)", margin: "0 0 10px" }}>Database Connection Failed</h2>
+          <p style={{ color: "var(--core-danger)", margin: 0 }}>{error}</p>
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  // Calculate highest risks
+  const criticalDepts = departments.filter((d) => d.health === "Critical");
+  const riskLabel = criticalDepts.length > 0 ? criticalDepts.map((d) => d.name).join(", ") : "None Detected";
+
   return (
     <ExecutiveShell activePath="/executive/departments">
       <PageHeader
         title="Departmental Performance"
-        description="Cross-departmental comparisons, budget allocations, resources, and deliverable health."
+        description="Cross-departmental project counts, headcounts, allocations, and blocker indicators from the live registry."
       />
 
-      {/* Grid of Department mini cards */}
+      {/* Grid of Department metrics */}
       <div className="core-grid" style={{ marginBottom: 32 }}>
-        <MetricCard label="Top Performing Department" value="Product Management">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            90% milestone completion rate with -0.5% budget variance.
+        <MetricCard label="Total Registered Departments" value={departments.length} />
+        <MetricCard label="Active Blocker Risks" value={riskLabel}>
+          <div style={{ marginTop: 8, fontSize: "13px", color: criticalDepts.length > 0 ? "var(--core-danger)" : "var(--core-text-muted)" }}>
+            Departments requiring immediate operational support.
           </div>
         </MetricCard>
-        <MetricCard label="Highest Operational Risk" value="IT Operations">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-danger)" }}>
-            3 critical blockers, 60% completion rate. Attention required.
-          </div>
-        </MetricCard>
-        <MetricCard label="Headcount & Budget Allocation" value="146 Members">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Aggregate budget variance is in-line (+0.4% organization-wide).
-          </div>
-        </MetricCard>
+        <MetricCard label="Total Organizational Headcount" value={departments.reduce((acc, d) => acc + d.headcount, 0)} />
       </div>
 
       {/* SVG Comparative Bar Chart */}
-      <div className="core-panel" style={{ marginBottom: 32 }}>
-        <h2>Active Projects & Blockers Comparison</h2>
-        <p style={{ fontSize: "13px", marginBottom: 20 }}>Visualizing project load against active blocking issues per department.</p>
-        <div style={{ height: 200, display: "flex", alignItems: "flex-end", gap: 32, paddingLeft: 40, borderBottom: "1px solid var(--core-border)", paddingBottom: 16 }}>
-          {departments.map((dept) => (
-            <div key={dept.id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 130 }}>
-                {/* Active Projects Bar */}
-                <div
-                  style={{
-                    width: 20,
-                    height: `${dept.activeProjects * 8}px`,
-                    background: "var(--core-executive)",
-                    borderRadius: "3px 3px 0 0",
-                    position: "relative"
-                  }}
-                  title={`Active Projects: ${dept.activeProjects}`}
-                />
-                {/* Blockers Bar */}
-                <div
-                  style={{
-                    width: 20,
-                    height: `${dept.blockers * 12}px`,
-                    background: "var(--core-danger)",
-                    borderRadius: "3px 3px 0 0",
-                    position: "relative"
-                  }}
-                  title={`Blockers: ${dept.blockers}`}
-                />
+      {departments.length > 0 && (
+        <div className="core-panel" style={{ marginBottom: 32 }}>
+          <h2>Projects & Blockers load per Division</h2>
+          <p style={{ fontSize: "13px", marginBottom: 20 }}>Visualizing project density against active blocking statuses from live tables.</p>
+          <div style={{ height: 200, display: "flex", alignItems: "flex-end", gap: 32, paddingLeft: 40, borderBottom: "1px solid var(--core-border)", paddingBottom: 16, overflowX: "auto" }}>
+            {departments.map((dept) => (
+              <div key={dept.id} style={{ flex: 1, minWidth: "60px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 130 }}>
+                  {/* Active Projects Bar */}
+                  <div
+                    style={{
+                      width: 16,
+                      height: `${Math.min(120, dept.activeProjects * 6)}px`,
+                      background: "var(--core-executive)",
+                      borderRadius: "3px 3px 0 0",
+                    }}
+                    title={`Projects: ${dept.activeProjects}`}
+                  />
+                  {/* Blockers Bar */}
+                  <div
+                    style={{
+                      width: 16,
+                      height: `${Math.min(120, dept.blockers * 20)}px`,
+                      background: "var(--core-danger)",
+                      borderRadius: "3px 3px 0 0",
+                    }}
+                    title={`Blockers: ${dept.blockers}`}
+                  />
+                </div>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--core-text-muted)", textAlign: "center", whiteSpace: "nowrap" }}>
+                  {dept.name}
+                </span>
               </div>
-              <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--core-text-muted)", textAlign: "center" }}>
-                {dept.name}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 12, justifyContent: "center", fontSize: "11px" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 12, height: 12, display: "inline-block", background: "var(--core-executive)", borderRadius: 2 }} /> Projects
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 12, height: 12, display: "inline-block", background: "var(--core-danger)", borderRadius: 2 }} /> Blockers
+            </span>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 16, marginTop: 12, justifyContent: "center", fontSize: "11px" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 12, height: 12, display: "inline-block", background: "var(--core-executive)", borderRadius: 2 }} /> Active Projects
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 12, height: 12, display: "inline-block", background: "var(--core-danger)", borderRadius: 2 }} /> Blockers
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* Filter and Table Toolbar */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: "200px" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+        <div style={{ position: "relative", flex: 1 }}>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--core-text-subtle)", display: "flex" }}>
             <SearchIcon />
           </span>
@@ -318,23 +237,6 @@ export default function ExecutiveDepartmentsPage() {
             }}
           />
         </div>
-        <select
-          value={unitFilter}
-          onChange={(e) => setUnitFilter(e.target.value)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "var(--core-radius-sm)",
-            border: "1px solid var(--core-border)",
-            background: "var(--core-surface)",
-            fontWeight: 500,
-            fontSize: "14px",
-            color: "var(--core-text)"
-          }}
-        >
-          <option value="All">All Business Units</option>
-          <option value="Product Development">Product Development</option>
-          <option value="Go-To-Market">Go-To-Market</option>
-        </select>
       </div>
 
       {/* Main comparison table */}
@@ -352,7 +254,7 @@ export default function ExecutiveDepartmentsPage() {
         isOpen={selectedDept !== null}
         onClose={() => setSelectedDept(null)}
         title={selectedDept?.name ?? ""}
-        subtitle={selectedDept?.unit ?? ""}
+        subtitle="Department Details"
         status={
           selectedDept ? (
             <span style={{
@@ -373,38 +275,21 @@ export default function ExecutiveDepartmentsPage() {
             <DrawerSection title="Overview">
               <DrawerField label="Department Head" value={selectedDept.head} />
               <DrawerField label="Headcount" value={selectedDept.headcount.toString()} />
-              <DrawerField label="Budget Variance" value={selectedDept.budgetVariance} />
-              <DrawerField label="Milestone Rate" value={selectedDept.completionRate} />
+              <DrawerField label="Description" value={selectedDept.description} />
+              <DrawerField label="Active Blocker Incidents" value={selectedDept.blockers.toString()} />
             </DrawerSection>
 
-            <DrawerSection title="Active Projects">
+            <DrawerSection title="Registered Projects">
               <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                {selectedDept.projects.map((proj, idx) => (
-                  <div key={idx} style={{ padding: 10, background: "var(--core-surface-muted)", borderRadius: "var(--core-radius-sm)", fontSize: "13px", fontWeight: 500 }}>
-                    {proj}
-                  </div>
-                ))}
-              </div>
-            </DrawerSection>
-
-            <DrawerSection title="Team Resource Workload">
-              <div style={{ width: "100%" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: "12px", fontWeight: 500 }}>
-                  <span>Resource Utilization</span>
-                  <span style={{ color: selectedDept.blockers > 2 ? "var(--core-danger)" : "var(--core-text)" }}>
-                    {selectedDept.blockers > 2 ? "94% (Overload)" : "78% (Optimal)"}
-                  </span>
-                </div>
-                <div style={{ width: "100%", height: 8, background: "var(--core-border)", borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{
-                    width: selectedDept.blockers > 2 ? "94%" : "78%",
-                    height: "100%",
-                    background: selectedDept.blockers > 2 ? "var(--core-danger)" : "var(--core-executive)"
-                  }} />
-                </div>
-                <p style={{ fontSize: "11px", color: "var(--core-text-subtle)", marginTop: 6, lineHeight: 1.4 }}>
-                  Resource loading shows aggregated assignments across active deliverables. Red indicates team capacity threshold has been breached.
-                </p>
+                {selectedDept.projects.length > 0 ? (
+                  selectedDept.projects.map((proj, idx) => (
+                    <div key={idx} style={{ padding: 10, background: "var(--core-surface-muted)", borderRadius: "var(--core-radius-sm)", fontSize: "13px", fontWeight: 500 }}>
+                      {proj}
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ fontSize: "13px", color: "var(--core-text-subtle)", margin: 0 }}>No projects currently assigned.</p>
+                )}
               </div>
             </DrawerSection>
           </div>

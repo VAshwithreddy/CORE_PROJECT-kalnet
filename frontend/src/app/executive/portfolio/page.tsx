@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExecutiveShell } from "@/components/executive-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
@@ -15,123 +15,85 @@ const SearchIcon = () => (
   </svg>
 );
 
-const FilterIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-  </svg>
-);
-
 interface Project {
   id: string;
   name: string;
   sponsor: string;
-  progressNum: number; // 0-100
-  status: "new" | "in-progress" | "blocked" | "completed";
+  progressNum: number;
+  status: string;
   budget: string;
-  startMonth: string; // "Jan", "Feb", etc.
-  startOffset: number; // 0-11 index for timeline bar position
-  duration: number; // monthly width
-  theme: "Growth" | "Tech Enablement" | "Cost Optimization";
-  milestones: string[];
+  target_date: string;
+  department: string;
+  theme: string;
   description: string;
+  milestones: string[];
 }
 
 export default function ExecutivePortfolioPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [themeFilter, setThemeFilter] = useState("All");
 
-  const projects: Project[] = [
-    {
-      id: "proj-emea",
-      name: "Expand to EMEA",
-      sponsor: "Michael K.",
-      progressNum: 45,
-      status: "in-progress",
-      budget: "$240,000",
-      startMonth: "Mar",
-      startOffset: 2,
-      duration: 6,
-      theme: "Growth",
-      milestones: ["Market Fit Survey (Done)", "Office Lease Signed (Done)", "GDPR Auditing (Delayed)", "Local Entity Setup (Pending)"],
-      description: "Establishing local entity, sales pipeline, and GDPR compliance checks in the EMEA region to secure local market capture."
-    },
-    {
-      id: "proj-ai",
-      name: "AI Integration",
-      sponsor: "Sarah W.",
-      progressNum: 20,
-      status: "blocked",
-      budget: "$480,000",
-      startMonth: "May",
-      startOffset: 4,
-      duration: 5,
-      theme: "Tech Enablement",
-      milestones: ["API Layer (Done)", "GPU Hosting Allocations (Blocked)", "Semantic Indexing (Pending)"],
-      description: "Infusing LLM-driven intelligence into CORE workflows, starting with smart ticket routing and automated department status summaries."
-    },
-    {
-      id: "proj-cost",
-      name: "Cost Reduction Plan",
-      sponsor: "David L.",
-      progressNum: 85,
-      status: "in-progress",
-      budget: "$95,000",
-      startMonth: "Jan",
-      startOffset: 0,
-      duration: 7,
-      theme: "Cost Optimization",
-      milestones: ["Tool License Audits (Done)", "AWS Instance Downsizing (Done)", "Legacy Server Decommission (Pending)"],
-      description: "Identifying redundant tools, downsizing under-utilized compute nodes, and renegotiating platform contracts to meet operational savings targets."
-    },
-    {
-      id: "proj-cloud",
-      name: "Cloud Migration Phase 2",
-      sponsor: "Jessica T.",
-      progressNum: 92,
-      status: "completed",
-      budget: "$180,000",
-      startMonth: "Feb",
-      startOffset: 1,
-      duration: 6,
-      theme: "Tech Enablement",
-      milestones: ["Data Migration (Done)", "Multi-region Deploy (Done)", "Failover Tests (Done)"],
-      description: "Transitioning legacy core services into AWS Supabase RDS instances to achieve role-based access control at the database layer."
-    },
-    {
-      id: "proj-cs",
-      name: "Customer Success Platform",
-      sponsor: "Michael K.",
-      progressNum: 10,
-      status: "new",
-      budget: "$150,000",
-      startMonth: "Jul",
-      startOffset: 6,
-      duration: 5,
-      theme: "Growth",
-      milestones: ["Requirements Gathering (Done)", "Vendor Selection (Pending)"],
-      description: "Setting up a client feedback and ticketing loop connected directly to internal employee assignments, enabling Stage 5 client compliance."
+  // Fetch portfolio data
+  useEffect(() => {
+    setLoading(true);
+    fetch("/executive/api?action=portfolio")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch portfolio projects");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setProjects(data);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  // Helper to generate deterministic timeline offsets for Gantt chart based on UUID
+  const getTimeline = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
     }
-  ];
+    const startOffset = Math.abs(hash) % 6; // 0 to 5 (Jan to Jun)
+    const duration = 3 + (Math.abs(hash) % 5); // 3 to 7 months
+    return { startOffset, duration };
+  };
 
   // Filtering
   const filteredProjects = projects.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.sponsor.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "All" || p.status === statusFilter;
+                          p.sponsor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.department.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status normalization
+    const normStatus = p.status === "active" || p.status === "in_progress" ? "in-progress" : p.status;
+    const matchesStatus = statusFilter === "All" || normStatus === statusFilter;
     const matchesTheme = themeFilter === "All" || p.theme === themeFilter;
     return matchesSearch && matchesStatus && matchesTheme;
   });
 
   const columns: DataTableColumn<Project>[] = [
     { key: "name", header: "Initiative Name", sortable: true },
+    { key: "department", header: "Owning Department", sortable: true },
     { key: "theme", header: "Strategic Theme", sortable: true },
-    { key: "sponsor", header: "Executive Sponsor", sortable: true },
+    { key: "sponsor", header: "Sponsor / Owner", sortable: true },
     { key: "budget", header: "Budget Allocation", sortable: true },
     {
       key: "progressNum",
-      header: "Execution Progress",
+      header: "Progress",
       sortable: true,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -151,7 +113,7 @@ export default function ExecutivePortfolioPage() {
         let color = "var(--core-info)";
         let bg = "var(--core-info-soft)";
 
-        if (row.status === "in-progress") {
+        if (row.status === "active" || row.status === "in_progress" || row.status === "in-progress") {
           label = "In Progress";
           color = "var(--core-executive)";
           bg = "var(--core-executive-soft)";
@@ -163,6 +125,10 @@ export default function ExecutivePortfolioPage() {
           label = "Completed";
           color = "var(--core-success)";
           bg = "var(--core-success-soft)";
+        } else if (row.status === "on_hold" || row.status === "on-hold") {
+          label = "On Hold";
+          color = "var(--core-warning)";
+          bg = "var(--core-warning-soft)";
         }
 
         return (
@@ -173,7 +139,8 @@ export default function ExecutivePortfolioPage() {
             backgroundColor: bg,
             color,
             fontSize: "12px",
-            fontWeight: 600
+            fontWeight: 600,
+            textTransform: "capitalize"
           }}>
             {label}
           </span>
@@ -182,103 +149,106 @@ export default function ExecutivePortfolioPage() {
     }
   ];
 
+  if (loading) {
+    return (
+      <ExecutiveShell activePath="/executive/portfolio">
+        <PageHeader title="Strategic Portfolio Roadmap" description="Connecting to live database..." />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+          <div style={{ width: "30px", height: "30px", border: "3px solid var(--core-border)", borderTop: "3px solid var(--core-executive)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExecutiveShell activePath="/executive/portfolio">
+        <PageHeader title="Strategic Portfolio Roadmap" description="Connection Error" />
+        <div className="core-panel" style={{ border: "1px solid var(--core-danger)", background: "var(--core-danger-soft)", color: "var(--core-danger)", padding: 20 }}>
+          <h2 style={{ color: "var(--core-danger)", margin: "0 0 10px" }}>Database Connection Failed</h2>
+          <p style={{ color: "var(--core-danger)", margin: 0 }}>{error}</p>
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
   return (
     <ExecutiveShell activePath="/executive/portfolio">
       <PageHeader
         title="Strategic Portfolio Roadmap"
-        description="Track milestones, execution progress, budget alignment, and timelines across organizational objectives."
+        description="Track milestones, execution status, budgets, and schedules mapped from live projects and assignments."
       />
 
       {/* KPI Section */}
       <div className="core-grid" style={{ marginBottom: 32 }}>
-        <MetricCard label="Strategic Initiatives" value="5 Active">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Covering Growth, Tech Enablement, and Cost Optimization themes.
-          </div>
-        </MetricCard>
-        <MetricCard label="Portfolio Execution Rate" value="50.4%">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Average completion rate across all 5 roadmap tracks.
-          </div>
-        </MetricCard>
-        <MetricCard label="Total Portfolio Budget" value="$1.14M">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Aggregated capital budget allocation for Phase 1.
-          </div>
-        </MetricCard>
+        <MetricCard label="Total Portfolio Projects" value={projects.length} />
+        <MetricCard label="Active Projects" value={projects.filter(p => p.status === "active").length} />
+        <MetricCard label="Strategic Objectives Themes" value="3 Focus Areas" />
       </div>
 
       {/* Gantt Timeline Roadmap Visualizer */}
-      <div className="core-panel" style={{ marginBottom: 32 }}>
-        <h2>Strategic Roadmap Timeline (2026)</h2>
-        <p style={{ fontSize: "13px", marginBottom: 20 }}>Overview of project durations, timelines, and milestone stages by month.</p>
-        
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: "600px" }}>
-            {/* Timeline Header Row */}
-            <div style={{ display: "grid", gridTemplateColumns: "180px repeat(12, 1fr)", borderBottom: "1px solid var(--core-border)", paddingBottom: 10 }}>
-              <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--core-text-subtle)" }}>Strategic Track</span>
-              {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
-                <span key={m} style={{ fontSize: "11px", fontWeight: 600, color: "var(--core-text-subtle)", textAlign: "center" }}>{m}</span>
-              ))}
-            </div>
+      {projects.length > 0 && (
+        <div className="core-panel" style={{ marginBottom: 32 }}>
+          <h2>Strategic Projects Timeline (2026)</h2>
+          <p style={{ fontSize: "13px", marginBottom: 20 }}>Visualizing project durations dynamically generated from database ID keys.</p>
+          
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: "600px" }}>
+              {/* Timeline Header Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "200px repeat(12, 1fr)", borderBottom: "1px solid var(--core-border)", paddingBottom: 10 }}>
+                <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--core-text-subtle)" }}>Strategic Track</span>
+                {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
+                  <span key={m} style={{ fontSize: "11px", fontWeight: 600, color: "var(--core-text-subtle)", textAlign: "center" }}>{m}</span>
+                ))}
+              </div>
 
-            {/* Timeline Project Bars */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 14 }}>
-              {projects.map((p) => {
-                let barColor = "var(--core-executive)";
-                if (p.status === "blocked") barColor = "var(--core-danger)";
-                else if (p.status === "completed") barColor = "var(--core-success)";
+              {/* Timeline Project Bars */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 14 }}>
+                {projects.map((p) => {
+                  const { startOffset, duration } = getTimeline(p.id);
+                  let barColor = "var(--core-executive)";
+                  if (p.status === "blocked") barColor = "var(--core-danger)";
+                  else if (p.status === "completed") barColor = "var(--core-success)";
+                  else if (p.status === "on_hold" || p.status === "on-hold") barColor = "var(--core-warning)";
 
-                return (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "180px repeat(12, 1fr)", alignItems: "center" }}>
-                    {/* Track Title */}
-                    <span style={{ fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 10 }}>
-                      {p.name}
-                    </span>
+                  return (
+                    <div key={p.id} style={{ display: "grid", gridTemplateColumns: "200px repeat(12, 1fr)", alignItems: "center" }}>
+                      {/* Track Title */}
+                      <span style={{ fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 10 }}>
+                        {p.name}
+                      </span>
 
-                    {/* Roadmap Timeline Bar container */}
-                    <div style={{ gridColumnStart: p.startOffset + 2, gridColumnEnd: p.startOffset + p.duration + 2, height: "18px", position: "relative" }}>
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          background: barColor,
-                          borderRadius: "9px",
-                          opacity: 0.85,
-                          boxShadow: "var(--core-shadow-sm)",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          paddingLeft: 8,
-                          color: "#fff",
-                          fontSize: "9px",
-                          fontWeight: 600
-                        }}
-                        onClick={() => setSelectedProject(p)}
-                      >
-                        {p.progressNum}%
+                      {/* Roadmap Timeline Bar */}
+                      <div style={{ gridColumnStart: startOffset + 2, gridColumnEnd: startOffset + duration + 2, height: "18px", position: "relative" }}>
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            background: barColor,
+                            borderRadius: "9px",
+                            opacity: 0.85,
+                            boxShadow: "var(--core-shadow-sm)",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            paddingLeft: 8,
+                            color: "#fff",
+                            fontSize: "9px",
+                            fontWeight: 600
+                          }}
+                          onClick={() => setSelectedProject(p)}
+                        >
+                          {p.progressNum}%
+                        </div>
                       </div>
-                      
-                      {/* Milestone Diamond Indicators */}
-                      <div style={{
-                        position: "absolute",
-                        right: "15%",
-                        top: "50%",
-                        transform: "translateY(-50%) rotate(45deg)",
-                        width: 8,
-                        height: 8,
-                        background: "var(--core-surface)",
-                        border: `1.5px solid ${barColor}`
-                      }} title="Milestone Target" />
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Toolbar / Search & Filter */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
@@ -360,7 +330,7 @@ export default function ExecutivePortfolioPage() {
         isOpen={selectedProject !== null}
         onClose={() => setSelectedProject(null)}
         title={selectedProject?.name ?? ""}
-        subtitle={`Strategic Objective | Theme: ${selectedProject?.theme}`}
+        subtitle={`Owning Department: ${selectedProject?.department} | Theme: ${selectedProject?.theme}`}
         status={
           selectedProject ? (
             <span style={{
@@ -369,9 +339,10 @@ export default function ExecutivePortfolioPage() {
               backgroundColor: selectedProject.status === "blocked" ? "var(--core-danger-soft)" : selectedProject.status === "completed" ? "var(--core-success-soft)" : "var(--core-executive-soft)",
               color: selectedProject.status === "blocked" ? "var(--core-danger)" : selectedProject.status === "completed" ? "var(--core-success)" : "var(--core-executive)",
               fontSize: "12px",
-              fontWeight: 600
+              fontWeight: 600,
+              textTransform: "capitalize"
             }}>
-              {selectedProject.status === "blocked" ? "Blocked" : selectedProject.status === "completed" ? "Completed" : "In Progress"}
+              {selectedProject.status}
             </span>
           ) : undefined
         }
@@ -379,10 +350,10 @@ export default function ExecutivePortfolioPage() {
         {selectedProject && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <DrawerSection title="Details">
-              <DrawerField label="Sponsor" value={selectedProject.sponsor} />
+              <DrawerField label="Sponsor / Lead" value={selectedProject.sponsor} />
               <DrawerField label="Budget Allocation" value={selectedProject.budget} />
-              <DrawerField label="Start Month" value={selectedProject.startMonth} />
-              <DrawerField label="Milestone Rate" value={`${selectedProject.progressNum}%`} />
+              <DrawerField label="Target Due Date" value={selectedProject.target_date} />
+              <DrawerField label="Progress achieved" value={`${selectedProject.progressNum}%`} />
             </DrawerSection>
 
             <DrawerSection title="About Track">
@@ -391,30 +362,26 @@ export default function ExecutivePortfolioPage() {
               </div>
             </DrawerSection>
 
-            <DrawerSection title="Milestones / Roadmap Steps">
+            <DrawerSection title="Registered Assignments">
               <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
-                {selectedProject.milestones.map((ms, idx) => {
-                  const isDone = ms.includes("(Done)");
-                  const isDelayed = ms.includes("(Delayed)");
-                  let dotColor = "var(--core-text-subtle)";
-                  if (isDone) dotColor = "var(--core-success)";
-                  else if (isDelayed) dotColor = "var(--core-danger)";
-
-                  return (
+                {selectedProject.milestones.length > 0 ? (
+                  selectedProject.milestones.map((ms, idx) => (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "13px" }}>
                       <span style={{
                         width: 8,
                         height: 8,
                         borderRadius: "50%",
-                        background: dotColor,
+                        background: ms.includes("Done") || ms.includes("On Track") ? "var(--core-success)" : "var(--core-text-subtle)",
                         display: "inline-block"
                       }} />
-                      <span style={{ fontWeight: 500, color: isDelayed ? "var(--core-danger)" : "var(--core-text)" }}>
+                      <span style={{ fontWeight: 500 }}>
                         {ms}
                       </span>
                     </div>
-                  );
-                })}
+                  ))
+                ) : (
+                  <p style={{ fontSize: "13px", color: "var(--core-text-subtle)", margin: 0 }}>No personnel assigned to this project yet.</p>
+                )}
               </div>
             </DrawerSection>
           </div>
