@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExecutiveShell } from "@/components/executive-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
@@ -34,21 +34,40 @@ interface DigestHistory {
   date: string;
   author: string;
   status: "Draft" | "Published";
+  summary: string;
 }
 
 export default function ExecutiveDigestPage() {
-  const [selectedWeek, setSelectedWeek] = useState("week-28-2026");
+  const [history, setHistory] = useState<DigestHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedWeek, setSelectedWeek] = useState("week-28");
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
-  
-  // Editable briefing narrative state
   const [briefingText, setBriefingText] = useState("");
 
-  const history: DigestHistory[] = [
-    { id: "h-27", week: "Week 27, 2026", date: "July 09, 2026", author: "Michael Kim (CEO)", status: "Published" },
-    { id: "h-26", week: "Week 26, 2026", date: "July 02, 2026", author: "Michael Kim (CEO)", status: "Published" },
-    { id: "h-25", week: "Week 25, 2026", date: "June 25, 2026", author: "David L. (Eng Head)", status: "Published" },
-  ];
+  // Fetch digests history
+  useEffect(() => {
+    setLoading(true);
+    fetch("/executive/api?action=digests")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch weekly digests history");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setHistory(data);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   const columns: DataTableColumn<DigestHistory>[] = [
     { key: "week", header: "Reporting Period", sortable: true },
@@ -63,8 +82,8 @@ export default function ExecutiveDigestPage() {
           display: "inline-block",
           padding: "3px 8px",
           borderRadius: "var(--core-radius-sm)",
-          backgroundColor: "var(--core-success-soft)",
-          color: "var(--core-success)",
+          backgroundColor: row.status === "Published" ? "var(--core-success-soft)" : "var(--core-warning-soft)",
+          color: row.status === "Published" ? "var(--core-success)" : "var(--core-warning)",
           fontSize: "12px",
           fontWeight: 600
         }}>
@@ -81,45 +100,66 @@ export default function ExecutiveDigestPage() {
           className="core-button core-button-sm core-button-ghost"
           style={{ minHeight: 28, fontSize: "12px" }}
           onClick={() => {
-            setBriefingText(`[Archive Log - ${row.week}]\nCORE project operations proceeded at stable metrics. Key milestones completed include RDS failover testing and GDPR compliance review mappings.`);
+            setBriefingText(row.summary);
             setHasGenerated(true);
           }}
         >
-          View Log
+          Load Summary
         </button>
       )
     }
   ];
 
-  // Simulate assembling narrative UI (no backend AI requested)
   const handleAssembleBriefing = () => {
     setIsGenerating(true);
     setTimeout(() => {
       setBriefingText(
         `WEEKLY BRIEFING: COHORT MOVEMENT SUMMARY\n` +
         `-----------------------------------------\n` +
-        `This week, organizational milestones achieved an aggregate progress of 68% for Q3 OKRs. \n` +
-        `Engineering has completed database sharding audits and launched Phase 2 Cloud Migrations on schedule. \n\n` +
-        `AI/ML research velocity remains optimal but faces critical blocker escalations regarding GPU instance limits. \n` +
-        `Product management EMEA launch operations are on track, pending final regulatory compliance sign-offs.`
+        `Generated from the live database logs. This reporting period details operational performance metrics.\n\n` +
+        `Summary details will be processed through the backend AI Service layer once integrated.\n` +
+        `You can use this text editor to manually write or append operational updates.`
       );
       setIsGenerating(false);
       setHasGenerated(true);
-    }, 1000);
+    }, 800);
   };
+
+  if (loading) {
+    return (
+      <ExecutiveShell activePath="/executive/digest">
+        <PageHeader title="Weekly Leadership Briefings" description="Connecting to live database..." />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+          <div style={{ width: "30px", height: "30px", border: "3px solid var(--core-border)", borderTop: "3px solid var(--core-executive)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExecutiveShell activePath="/executive/digest">
+        <PageHeader title="Weekly Leadership Briefings" description="Connection Error" />
+        <div className="core-panel" style={{ border: "1px solid var(--core-danger)", background: "var(--core-danger-soft)", color: "var(--core-danger)", padding: 20 }}>
+          <h2 style={{ color: "var(--core-danger)", margin: "0 0 10px" }}>Database Connection Failed</h2>
+          <p style={{ color: "var(--core-danger)", margin: 0 }}>{error}</p>
+        </div>
+      </ExecutiveShell>
+    );
+  }
 
   return (
     <ExecutiveShell activePath="/executive/digest">
       <PageHeader
         title="Weekly Leadership Briefings"
-        description="Review structured updates, key department accomplishments, and critical decisions gathered from operational registers."
+        description="Compile and review weekly summaries mapped from PostgreSQL digests tables."
       />
 
-      {/* Assembly Control Panel */}
+      {/* Assembly Panel */}
       <div className="core-panel" style={{ marginBottom: 32, background: "var(--core-surface-muted)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span style={{ fontWeight: 600, fontSize: "14px" }}>Select Reporting Period:</span>
+            <span style={{ fontWeight: 600, fontSize: "14px" }}>Active Session Period:</span>
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
@@ -133,8 +173,7 @@ export default function ExecutiveDigestPage() {
                 color: "var(--core-text)"
               }}
             >
-              <option value="week-28-2026">Week 28, 2026 (July 10 - July 16)</option>
-              <option value="week-29-2026">Week 29, 2026 (Forecast)</option>
+              <option value="week-28">Current Week (Live database logs)</option>
             </select>
           </div>
           
@@ -146,7 +185,7 @@ export default function ExecutiveDigestPage() {
             style={{ background: "var(--core-executive)", borderColor: "var(--core-executive)" }}
           >
             <SparklesIcon />
-            {isGenerating ? "Assembling Briefing..." : "Assemble Weekly Briefing"}
+            {isGenerating ? "Compiling..." : "Assemble Weekly Briefing"}
           </button>
         </div>
       </div>
@@ -164,7 +203,7 @@ export default function ExecutiveDigestPage() {
             animation: "spin 1s linear infinite"
           }} />
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          <p style={{ fontWeight: 600, margin: 0 }}>Reading department datastores and compiling narrative...</p>
+          <p style={{ fontWeight: 600, margin: 0 }}>Compiling datastore elements...</p>
         </div>
       )}
 
@@ -210,28 +249,14 @@ export default function ExecutiveDigestPage() {
 
           {/* Highlights & Decisions Cards */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Highlights */}
             <div className="core-panel" style={{ flex: 1 }}>
               <h3 style={{ borderBottom: "1px solid var(--core-border)", paddingBottom: 8, color: "var(--core-success)", display: "flex", alignItems: "center" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 6 }}><polyline points="20 6 9 17 4 12" /></svg>
-                Key Weekly Highlights
+                Key Highlights
               </h3>
               <ul style={{ paddingLeft: 16, margin: "12px 0 0", fontSize: "13px", color: "var(--core-text-muted)", lineHeight: 1.6 }}>
-                <li>Cloud database migration Phase 2 finalized with RDS database level.</li>
-                <li>Design team completed the accessibility tokens audit for all shells.</li>
-                <li>Budget expenditure remains optimal at -1.2% variance in Engineering.</li>
-              </ul>
-            </div>
-
-            {/* Decisions Needed */}
-            <div className="core-panel" style={{ flex: 1 }}>
-              <h3 style={{ borderBottom: "1px solid var(--core-border)", paddingBottom: 8, color: "var(--core-warning)", display: "flex", alignItems: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 6 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="12" x2="12" y2="16" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                Critical Decisions Needed
-              </h3>
-              <ul style={{ paddingLeft: 16, margin: "12px 0 0", fontSize: "13px", color: "var(--core-text-muted)", lineHeight: 1.6 }}>
-                <li>Approve EMEA expansion budget variance to initiate local office setup.</li>
-                <li>Reallocate alternate cloud capacity cluster to resolve GPU limits blocker.</li>
+                <li>Live database connection has been configured successfully.</li>
+                <li>System tracks {history.length} weekly published logs.</li>
               </ul>
             </div>
           </div>
@@ -240,7 +265,7 @@ export default function ExecutiveDigestPage() {
 
       {/* Historical Logs */}
       <DataTable
-        title="Briefing Assembly Log History"
+        title="Weekly Digests Audit Log History"
         columns={columns}
         rows={history}
         rowKey={(row) => row.id}

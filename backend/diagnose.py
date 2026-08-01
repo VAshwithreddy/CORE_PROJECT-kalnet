@@ -1,6 +1,6 @@
 """
 Diagnostic script — runs against the live backend to capture real tracebacks.
-Run this from: c:\Users\aagya\CORE_PROJECT-kalnet\backend
+Run this from: c:\\Users\\aagya\\CORE_PROJECT-kalnet\\backend
 Command: python diagnose.py
 """
 import sys
