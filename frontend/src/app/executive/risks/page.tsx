@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExecutiveShell } from "@/components/executive-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
@@ -31,12 +31,16 @@ interface Risk {
   impact: number; // 1-5
   score: number; // likelihood * impact
   owner: string;
-  status: "Open" | "Escalated" | "Mitigated";
+  status: string;
   mitigation: string;
-  progress: number; // 0-100
+  progress: number;
 }
 
 export default function ExecutiveRisksPage() {
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -45,70 +49,29 @@ export default function ExecutiveRisksPage() {
   // Matrix coordinate filter: [likelihood, impact]
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
 
-  const [risks, setRisks] = useState<Risk[]>([
-    {
-      id: "risk-gpu",
-      name: "GPU Instance Shortage",
-      category: "Infrastructure",
-      likelihood: 4,
-      impact: 4,
-      score: 16,
-      owner: "Sarah W.",
-      status: "Open",
-      mitigation: "Establish multi-cloud contract agreements with auxiliary hosting providers.",
-      progress: 40
-    },
-    {
-      id: "risk-legal",
-      name: "EMEA Legal Launch Delay",
-      category: "Compliance",
-      likelihood: 3,
-      impact: 4,
-      score: 12,
-      owner: "Michael K.",
-      status: "Open",
-      mitigation: "Retain local legal representation in the UK and Germany to expedite audits.",
-      progress: 60
-    },
-    {
-      id: "risk-shard",
-      name: "Database Sharding Latency spikes",
-      category: "Performance",
-      likelihood: 2,
-      impact: 3,
-      score: 6,
-      owner: "David L.",
-      status: "Mitigated",
-      mitigation: "Deploy auxiliary read replicas and caching layers to minimize RDS workload.",
-      progress: 95
-    },
-    {
-      id: "risk-turnover",
-      name: "Key AI Engineer Turnover",
-      category: "Human Resources",
-      likelihood: 3,
-      impact: 5,
-      score: 15,
-      owner: "Sarah W.",
-      status: "Escalated",
-      mitigation: "Conduct compensation audit and introduce project bonuses.",
-      progress: 15
-    },
-    {
-      id: "risk-cost",
-      name: "AWS Compute Cost Overrun",
-      category: "Financial",
-      likelihood: 4,
-      impact: 2,
-      score: 8,
-      owner: "Jessica T.",
-      status: "Open",
-      mitigation: "Decommission development servers off-hours and setup automated alerts.",
-      progress: 80
-    }
-  ]);
+  // Fetch risks data
+  useEffect(() => {
+    setLoading(true);
+    fetch("/executive/api?action=risks")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch risks data");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setRisks(data);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
-  // Handle local state changes
+  // Handle local state updates (simulation on top of DB fetch)
   const handleEscalateRisk = (id: string) => {
     setRisks((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: "Escalated" } : r))
@@ -128,7 +91,9 @@ export default function ExecutiveRisksPage() {
     const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           r.owner.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === "All" || r.category === categoryFilter;
-    const matchesStatus = statusFilter === "All" || r.status === statusFilter;
+    
+    // Status filter normalization
+    const matchesStatus = statusFilter === "All" || r.status.toLowerCase() === statusFilter.toLowerCase();
     
     // Cell filter matching
     const matchesCell = selectedCell === null || (r.likelihood === selectedCell[0] && r.impact === selectedCell[1]);
@@ -201,10 +166,10 @@ export default function ExecutiveRisksPage() {
       render: (row) => {
         let color = "var(--core-warning)";
         let bg = "var(--core-warning-soft)";
-        if (row.status === "Mitigated") {
+        if (row.status.toLowerCase() === "mitigated") {
           color = "var(--core-success)";
           bg = "var(--core-success-soft)";
-        } else if (row.status === "Escalated") {
+        } else if (row.status.toLowerCase() === "escalated") {
           color = "var(--core-danger)";
           bg = "var(--core-danger-soft)";
         }
@@ -217,7 +182,8 @@ export default function ExecutiveRisksPage() {
             backgroundColor: bg,
             color,
             fontSize: "12px",
-            fontWeight: 600
+            fontWeight: 600,
+            textTransform: "capitalize"
           }}>
             {row.status}
           </span>
@@ -226,30 +192,41 @@ export default function ExecutiveRisksPage() {
     }
   ];
 
+  if (loading) {
+    return (
+      <ExecutiveShell activePath="/executive/risks">
+        <PageHeader title="Enterprise Risk Register" description="Connecting to live database..." />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+          <div style={{ width: "30px", height: "30px", border: "3px solid var(--core-border)", borderTop: "3px solid var(--core-executive)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExecutiveShell activePath="/executive/risks">
+        <PageHeader title="Enterprise Risk Register" description="Connection Error" />
+        <div className="core-panel" style={{ border: "1px solid var(--core-danger)", background: "var(--core-danger-soft)", color: "var(--core-danger)", padding: 20 }}>
+          <h2 style={{ color: "var(--core-danger)", margin: "0 0 10px" }}>Database Connection Failed</h2>
+          <p style={{ color: "var(--core-danger)", margin: 0 }}>{error}</p>
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
   return (
     <ExecutiveShell activePath="/executive/risks">
       <PageHeader
         title="Enterprise Risk Register"
-        description="Monitor organization-level operational risks, track mitigation actions, and manage escalations."
+        description="Monitor system alerts and compliance reviews fetched directly from live PostgreSQL database records."
       />
 
       {/* KPI Cards */}
       <div className="core-grid" style={{ marginBottom: 32 }}>
-        <MetricCard label="Active Escalations" value={risks.filter((r) => r.status === "Escalated").length}>
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-danger)" }}>
-            High severity issues requiring urgent corporate mitigation.
-          </div>
-        </MetricCard>
-        <MetricCard label="Highest Risk Score" value="16 (GPU Supply)">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Infrastructure category, rated 4x4 (Almost Certain & Major).
-          </div>
-        </MetricCard>
-        <MetricCard label="Mitigation Health" value="70%">
-          <div style={{ marginTop: 8, fontSize: "13px", color: "var(--core-text-muted)" }}>
-            Aggregate progress across all current action items.
-          </div>
-        </MetricCard>
+        <MetricCard label="Total Identified Risks" value={risks.length} />
+        <MetricCard label="Active Escalations" value={risks.filter((r) => r.status.toLowerCase() === "escalated").length} />
+        <MetricCard label="Mitigated Threats" value={risks.filter((r) => r.status.toLowerCase() === "mitigated").length} />
       </div>
 
       {/* Heatmap Grid & Matrix Guide */}
@@ -270,7 +247,7 @@ export default function ExecutiveRisksPage() {
             )}
           </div>
           <p style={{ fontSize: "12px", color: "var(--core-text-muted)", marginBottom: 16 }}>
-            Click on a cell below to filter the registry list. Columns: Likelihood (1-5), Rows: Impact (1-5).
+            Click on a cell below to filter the risk registry list.
           </p>
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -301,7 +278,6 @@ export default function ExecutiveRisksPage() {
                         userSelect: "none"
                       }}
                       onClick={() => setSelectedCell([likeVal, impactVal])}
-                      title={`Likelihood ${likeVal} x Impact ${impactVal}`}
                     >
                       {count > 0 ? `${count}` : ""}
                     </div>
@@ -334,7 +310,7 @@ export default function ExecutiveRisksPage() {
               </span>
               <div>
                 <p style={{ fontWeight: 600, fontSize: "13px", color: "var(--core-danger)", margin: "0 0 2px" }}>High Risk (Score 15-25)</p>
-                <p style={{ fontSize: "11px", color: "var(--core-text-muted)", margin: 0 }}>Requires immediate mitigation roadmap updates and weekly review by executive sponsors.</p>
+                <p style={{ fontSize: "11px", color: "var(--core-text-muted)", margin: 0 }}>Requires immediate mitigation updates and weekly review by executive sponsors.</p>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "start", gap: 10, padding: 8, borderRadius: "var(--core-radius-sm)", border: "1px solid #fef3c7", background: "#fef3c7" }}>
@@ -344,15 +320,6 @@ export default function ExecutiveRisksPage() {
               <div>
                 <p style={{ fontWeight: 600, fontSize: "13px", color: "var(--core-warning)", margin: "0 0 2px" }}>Medium Risk (Score 9-14)</p>
                 <p style={{ fontSize: "11px", color: "var(--core-text-muted)", margin: 0 }}>Requires assigned mitigation owner and bi-weekly milestone status briefings.</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "start", gap: 10, padding: 8, borderRadius: "var(--core-radius-sm)", border: "1px solid #dcfce7", background: "#dcfce7" }}>
-              <span style={{ color: "var(--core-success)", marginTop: 2, display: "flex" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-              </span>
-              <div>
-                <p style={{ fontWeight: 600, fontSize: "13px", color: "var(--core-success)", margin: "0 0 2px" }}>Low Risk (Score 1-8)</p>
-                <p style={{ fontSize: "11px", color: "var(--core-text-muted)", margin: 0 }}>Logged and monitored in department trackers. Low operational impacts.</p>
               </div>
             </div>
           </div>
@@ -444,17 +411,18 @@ export default function ExecutiveRisksPage() {
             <span style={{
               padding: "4px 8px",
               borderRadius: "var(--core-radius-sm)",
-              backgroundColor: selectedRisk.status === "Mitigated" ? "var(--core-success-soft)" : selectedRisk.status === "Escalated" ? "var(--core-danger-soft)" : "var(--core-warning-soft)",
-              color: selectedRisk.status === "Mitigated" ? "var(--core-success)" : selectedRisk.status === "Escalated" ? "var(--core-danger)" : "var(--core-warning)",
+              backgroundColor: selectedRisk.status.toLowerCase() === "mitigated" ? "var(--core-success-soft)" : selectedRisk.status.toLowerCase() === "escalated" ? "var(--core-danger-soft)" : "var(--core-warning-soft)",
+              color: selectedRisk.status.toLowerCase() === "mitigated" ? "var(--core-success)" : selectedRisk.status.toLowerCase() === "escalated" ? "var(--core-danger)" : "var(--core-warning)",
               fontSize: "12px",
-              fontWeight: 600
+              fontWeight: 600,
+              textTransform: "capitalize"
             }}>
               {selectedRisk.status}
             </span>
           ) : undefined
         }
         footerLeft={
-          selectedRisk && selectedRisk.status !== "Escalated" && (
+          selectedRisk && selectedRisk.status.toLowerCase() !== "escalated" && (
             <button
               type="button"
               className="core-button core-button-danger"
@@ -465,7 +433,7 @@ export default function ExecutiveRisksPage() {
           )
         }
         footerRight={
-          selectedRisk && selectedRisk.status !== "Mitigated" && (
+          selectedRisk && selectedRisk.status.toLowerCase() !== "mitigated" && (
             <button
               type="button"
               className="core-button core-button-primary"
@@ -485,7 +453,7 @@ export default function ExecutiveRisksPage() {
               <DrawerField label="Mitigation Owner" value={selectedRisk.owner} />
             </DrawerSection>
 
-            <DrawerSection title="Mitigation Plan">
+            <DrawerSection title="Mitigation Plan / Alert context">
               <div style={{ fontSize: "13px", color: "var(--core-text-muted)", lineHeight: 1.6, width: "100%" }}>
                 {selectedRisk.mitigation}
               </div>

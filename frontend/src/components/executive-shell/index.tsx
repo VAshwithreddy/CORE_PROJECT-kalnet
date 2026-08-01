@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
+import { useState } from "react";
 
 interface ExecutiveShellProps {
   children: ReactNode;

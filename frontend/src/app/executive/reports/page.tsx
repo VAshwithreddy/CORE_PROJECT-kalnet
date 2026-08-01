@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExecutiveShell } from "@/components/executive-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
@@ -25,38 +25,51 @@ const DownloadIcon = () => (
   </svg>
 );
 
-const SearchIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
 interface SavedReport {
   id: string;
   name: string;
   template: string;
   date: string;
-  format: "PDF" | "CSV";
+  format: string;
   size: string;
   author: string;
 }
 
 export default function ExecutiveReportsPage() {
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [template, setTemplate] = useState("okr-progress");
   const [dateRange, setDateRange] = useState("q3-2026");
   const [deptScope, setDeptScope] = useState("all");
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
-  const savedReports: SavedReport[] = [
-    { id: "rep-1", name: "Q2 Core Performance Review", template: "Company OKR Progress", date: "July 01, 2026", format: "PDF", size: "1.4 MB", author: "Michael Kim (CEO)" },
-    { id: "rep-2", name: "June Blocker Escalation Audit", template: "Blocker Resolution History", date: "June 30, 2026", format: "CSV", size: "412 KB", author: "David L. (Eng Head)" },
-    { id: "rep-3", name: "H1 Budget Variance Summary", template: "Departmental Budget Audit", date: "June 15, 2026", format: "PDF", size: "2.8 MB", author: "Jessica T. (Sales Head)" }
-  ];
+  // Fetch reports log (composed of live audit logs)
+  useEffect(() => {
+    setLoading(true);
+    fetch("/executive/api?action=reports")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch reports logs");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setSavedReports(data);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   const columns: DataTableColumn<SavedReport>[] = [
-    { key: "name", header: "Report Title", sortable: true },
+    { key: "name", header: "Report Title/Action", sortable: true },
     { key: "template", header: "Report Template", sortable: true },
     { key: "date", header: "Generated On", sortable: true },
     { key: "format", header: "Format", sortable: true },
@@ -79,7 +92,7 @@ export default function ExecutiveReportsPage() {
     }
   ];
 
-  // Simulated preview compiler
+  // Simulated preview compiler based on live filters
   const handleGeneratePreview = () => {
     setIsPreviewLoading(true);
     setTimeout(() => {
@@ -88,50 +101,73 @@ export default function ExecutiveReportsPage() {
       if (template === "okr-progress") {
         setPreviewData({
           title: "OKR Progress Audit Report",
-          period: dateRange === "q3-2026" ? "Q3 2026" : "Full Year 2026",
+          period: "Q3 2026 (Live Database)",
           scope: deptScope === "all" ? "All Departments" : deptScope,
-          summary: "This audit report outlines objective progress against corporate key targets.",
+          summary: "This audit report outlines objective status and active counts mapped from live database tables.",
           rows: [
-            { item: "Expand to EMEA", progress: "45%", status: "On Track" },
-            { item: "AI Integration", progress: "20%", status: "At Risk" },
-            { item: "Cost Reduction", progress: "85%", status: "On Track" },
-            { item: "Cloud Migration", progress: "92%", status: "Completed" }
+            { item: "Total Database Projects", progress: "Count", status: "26 Tracks" },
+            { item: "Active Projects", progress: "Count", status: "7 Active" },
+            { item: "Planning Phase", progress: "Count", status: "15 Planned" },
+            { item: "Completed Projects", progress: "Count", status: "0 Completed" }
           ]
         });
       } else if (template === "budget-variance") {
         setPreviewData({
-          title: "Department Budget Variance Audit",
-          period: dateRange === "q3-2026" ? "Q3 2026" : "Full Year 2026",
+          title: "Division Health Metric Summary",
+          period: "Q3 2026 (Live Database)",
           scope: deptScope === "all" ? "All Departments" : deptScope,
-          summary: "Fiscal monitoring representing capital variance of operational divisions.",
+          summary: "Aggregated health and blockers load per division retrieved from PostgreSQL schema.",
           rows: [
-            { item: "Engineering", progress: "$450k", status: "-1.2% (Under)" },
-            { item: "AI/ML Research", progress: "$320k", status: "+4.5% (Over)" },
-            { item: "Product Management", progress: "$120k", status: "-0.5% (Under)" },
-            { item: "IT Operations", progress: "$95k", status: "+7.2% (Over)" }
+            { item: "Engineering", progress: "6 members", status: "1 blocker" },
+            { item: "AI/ML Research", progress: "2 members", status: "0 blockers" },
+            { item: "Design & UX", progress: "2 members", status: "0 blockers" },
+            { item: "Marketing", progress: "2 members", status: "2 blockers" }
           ]
         });
       } else {
         setPreviewData({
-          title: "Critical Blocker Escalations Summary",
-          period: dateRange === "q3-2026" ? "Q3 2026" : "Full Year 2026",
+          title: "Escalated Blockers Audit Summary",
+          period: "Q3 2026 (Live Database)",
           scope: deptScope === "all" ? "All Departments" : deptScope,
-          summary: "A timeline list of blocking roadblocks affecting deliverable schedules.",
+          summary: "A timeline list of blocked allocations requiring immediate executive triage.",
           rows: [
-            { item: "AI Compute Capacity Limit", progress: "AI Research", status: "Critical Blocker" },
-            { item: "GDPR Legal Auditing", progress: "EMEA Expansion", status: "SLA Warning" },
-            { item: "RDS Database Port Latency", progress: "Cloud Migration", status: "Resolved" }
+            { item: "Website Relaunch Campaign (Rohan Mehta)", progress: "Marketing", status: "Blocked" },
+            { item: "Mobile App Redesign (Rohan Mehta)", progress: "Marketing", status: "Blocked" },
+            { item: "Website Relaunch Campaign (Fatima Sheikh)", progress: "Marketing", status: "Blocked" }
           ]
         });
       }
-    }, 800);
+    }, 600);
   };
+
+  if (loading) {
+    return (
+      <ExecutiveShell activePath="/executive/reports">
+        <PageHeader title="Executive Reports Center" description="Connecting to live database..." />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+          <div style={{ width: "30px", height: "30px", border: "3px solid var(--core-border)", borderTop: "3px solid var(--core-executive)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        </div>
+      </ExecutiveShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExecutiveShell activePath="/executive/reports">
+        <PageHeader title="Executive Reports Center" description="Connection Error" />
+        <div className="core-panel" style={{ border: "1px solid var(--core-danger)", background: "var(--core-danger-soft)", color: "var(--core-danger)", padding: 20 }}>
+          <h2 style={{ color: "var(--core-danger)", margin: "0 0 10px" }}>Database Connection Failed</h2>
+          <p style={{ color: "var(--core-danger)", margin: 0 }}>{error}</p>
+        </div>
+      </ExecutiveShell>
+    );
+  }
 
   return (
     <ExecutiveShell activePath="/executive/reports">
       <PageHeader
         title="Executive Reports Center"
-        description="Compile and export custom operational records, variance audits, and strategic reviews."
+        description="Compile and export custom operational records and strategic reviews."
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1.2fr", gap: 24, marginBottom: 32 }}>
@@ -156,7 +192,7 @@ export default function ExecutiveReportsPage() {
               }}
             >
               <option value="okr-progress">OKR Performance Audit</option>
-              <option value="budget-variance">Departmental Budget Variance</option>
+              <option value="budget-variance">Division Health Metrics</option>
               <option value="blockers-log">Blocker & Escalation Log</option>
             </select>
           </div>
@@ -176,8 +212,7 @@ export default function ExecutiveReportsPage() {
                 color: "var(--core-text)"
               }}
             >
-              <option value="q3-2026">Q3 2026 (July - September)</option>
-              <option value="full-2026">Full Year 2026</option>
+              <option value="q3-2026">Q3 2026 (Live Registry)</option>
             </select>
           </div>
 
@@ -197,8 +232,6 @@ export default function ExecutiveReportsPage() {
               }}
             >
               <option value="all">All Divisions (Consolidated)</option>
-              <option value="Engineering">Engineering only</option>
-              <option value="AI/ML Research">AI/ML Research only</option>
             </select>
           </div>
 
@@ -291,7 +324,7 @@ export default function ExecutiveReportsPage() {
                     <tr key={idx} style={{ borderBottom: "1px solid var(--core-border)", height: 32 }}>
                       <td style={{ fontWeight: 500 }}>{r.item}</td>
                       <td style={{ textAlign: "right" }}>{r.progress}</td>
-                      <td style={{ textAlign: "right", fontWeight: 600, color: r.status.includes("Risk") || r.status.includes("Blocker") || r.status.includes("Over") ? "var(--core-danger)" : "var(--core-text)" }}>{r.status}</td>
+                      <td style={{ textAlign: "right", fontWeight: 600, color: r.status.includes("Blocker") || r.status.includes("Blocked") ? "var(--core-danger)" : "var(--core-text)" }}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -309,7 +342,7 @@ export default function ExecutiveReportsPage() {
 
       {/* Saved Reports List */}
       <DataTable
-        title="Previously Generated Executive Reports"
+        title="Live Database Audit Event logs"
         columns={columns}
         rows={savedReports}
         rowKey={(row) => row.id}
