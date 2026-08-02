@@ -4,7 +4,7 @@ No dummy/hardcoded data is used anywhere in this module.
 """
 import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 
 from src.models.project import Project
 from src.models.assignment import Assignment
@@ -20,6 +20,17 @@ from src.schemas.dashboards import (
     ExecutiveDashboardResponse,
     WorkAdminDashboardResponse,
 )
+
+
+def _get_current_user(db: Session) -> Person | None:
+    """Helper to retrieve Person record matching app.current_user_id setting."""
+    try:
+        user_id_str = db.execute(text("SELECT current_setting('app.current_user_id', true)")).scalar()
+        if user_id_str:
+            return db.query(Person).filter(Person.id == user_id_str).first()
+    except Exception:
+        pass
+    return None
 
 
 class DashboardsService:

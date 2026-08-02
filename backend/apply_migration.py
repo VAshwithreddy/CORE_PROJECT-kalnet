@@ -15,16 +15,21 @@ def main():
 
     print(f"Connecting to database...")
     engine = create_engine(db_url)
-    
-    with open("migrations/001_rls_policies.sql", "r") as f:
-        sql = f.read()
 
-    print("Applying migration 001_rls_policies.sql...")
+    migrations_dir = "migrations"
+    sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
+
     with engine.connect() as conn:
-        # We need to split the SQL and execute each statement or execute it all if the driver allows
-        conn.execute(text(sql))
-        conn.commit()
-    print("Migration applied successfully.")
+        for fname in sql_files:
+            fpath = os.path.join(migrations_dir, fname)
+            print(f"Applying migration {fname}...")
+            with open(fpath, "r", encoding="utf-8") as f:
+                sql = f.read()
+            conn.execute(text(sql))
+            conn.commit()
+            print(f"Migration {fname} applied successfully.")
+
+    print("All migrations applied successfully.")
 
 if __name__ == "__main__":
     main()
