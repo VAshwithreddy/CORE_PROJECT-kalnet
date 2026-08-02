@@ -12,6 +12,7 @@ Uses HTTPBearer so Swagger shows a simple "paste your token" box rather than
 an OAuth2 username/password form (which would need form-encoded credentials,
 incompatible with our JSON-based /auth/login endpoint).
 """
+import logging
 from dataclasses import dataclass
 from typing import Callable, Set
 from uuid import UUID
@@ -21,6 +22,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt, ExpiredSignatureError
 
 from src.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
 
@@ -59,30 +62,48 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    algorithms = settings.jwt_algorithms if hasattr(settings, "jwt_algorithms") else [ALGORITHM]
+
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key, algorithms=algorithms)
     except ExpiredSignatureError:
+        logger.warning("JWT validation failed: Access token has expired.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Access token has expired.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except JWTError:
+    except JWTError as exc:
+        logger.warning(f"JWT decode error: {exc}")
+        try:
+            unverified = jwt.get_unverified_claims(token)
+            header = jwt.get_unverified_header(token)
+            logger.warning(f"Unverified token info - Header: {header}, sub claim: {unverified.get('sub')}")
+        except Exception:
+            pass
         raise credentials_exc
 
     sub: str = payload.get("sub")
     if not sub:
+        logger.warning("JWT validation failed: 'sub' claim missing from payload.")
         raise credentials_exc
 
     try:
         person_id = UUID(sub)
     except ValueError:
+        logger.warning(f"JWT validation failed: 'sub' claim '{sub}' is not a valid UUID.")
         raise credentials_exc
+
+    role = payload.get("role")
+    if not role:
+        app_meta = payload.get("app_metadata", {})
+        user_meta = payload.get("user_metadata", {})
+        role = app_meta.get("role") or user_meta.get("role") or "employee"
 
     return CurrentUser(
         person_id=person_id,
         email=payload.get("email", ""),
-        role=payload.get("role", "employee"),
+        role=str(role),
     )
 
 

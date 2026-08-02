@@ -31,7 +31,7 @@ def get_employee_dashboard(
     tags=["Dashboards"],
     dependencies=[Depends(require_roles("department_head", "team_leader", "executive", "work_admin", "system_admin"))]
 )
-def get_department_dashboard(db: Session = Depends(get_db)) -> DepartmentDashboardResponse:
+def get_department_dashboard(db: Session = Depends(get_rls_db_for(get_current_user))) -> DepartmentDashboardResponse:
     """
     Overview for a department head / team leader.
     Returns aggregation of all projects and members in their department.
@@ -44,7 +44,7 @@ def get_department_dashboard(db: Session = Depends(get_db)) -> DepartmentDashboa
     tags=["Dashboards"],
     dependencies=[Depends(require_roles("executive", "work_admin", "system_admin"))]
 )
-def get_executive_dashboard(db: Session = Depends(get_db)) -> ExecutiveDashboardResponse:
+def get_executive_dashboard(db: Session = Depends(get_rls_db_for(get_current_user))) -> ExecutiveDashboardResponse:
     """
     High-level overview for leadership.
     Focuses on organizational health, cross-department metrics, and critical risks.
@@ -57,7 +57,7 @@ def get_executive_dashboard(db: Session = Depends(get_db)) -> ExecutiveDashboard
     tags=["Dashboards"],
     dependencies=[Depends(require_roles("work_admin", "system_admin"))]
 )
-def get_work_admin_dashboard(db: Session = Depends(get_db)) -> WorkAdminDashboardResponse:
+def get_work_admin_dashboard(db: Session = Depends(get_rls_db_for(get_current_user))) -> WorkAdminDashboardResponse:
     """
     Operational overview for resource managers.
     Focuses on utilization, unassigned work, and system-wide bottlenecks.
