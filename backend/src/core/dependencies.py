@@ -14,7 +14,7 @@ incompatible with our JSON-based /auth/login endpoint).
 """
 import logging
 from dataclasses import dataclass
-from typing import Callable, Set
+from typing import Callable, Set, Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 ALGORITHM = "HS256"
 
 # HTTPBearer: Swagger renders a simple token input box (Value: <your token>).
-# The user pastes the access_token from POST /auth/login directly — no form flow.
-_bearer_scheme = HTTPBearer(auto_error=True)
+# Setting auto_error=False allows us to raise HTTP 401 Unauthorized on missing tokens (instead of FastAPI's default 403 Forbidden).
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @dataclass
@@ -41,7 +41,7 @@ class CurrentUser:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> CurrentUser:
     """
     Decode and validate the JWT Bearer token.
@@ -55,6 +55,13 @@ def get_current_user(
     - The token has expired.
     - The ``sub`` claim (person UUID) is absent or malformed.
     """
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials  # HTTPBearer strips the "Bearer " prefix
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

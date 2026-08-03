@@ -37,6 +37,7 @@ try:
         DATABASE_URL,
         pool_pre_ping=True,
         pool_recycle=300,
+        connect_args={"client_encoding": "utf8"},
     )
 
     SessionLocal = sessionmaker(
