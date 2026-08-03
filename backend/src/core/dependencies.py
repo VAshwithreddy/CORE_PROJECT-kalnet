@@ -32,6 +32,32 @@ ALGORITHM = "HS256"
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
+import urllib.request
+import json
+import time
+from jose import jwk
+
+_jwks_cache = None
+_jwks_cache_expiry = 0
+
+def get_jwks() -> dict:
+    global _jwks_cache, _jwks_cache_expiry
+    now = time.time()
+    if _jwks_cache is None or now > _jwks_cache_expiry:
+        if not settings.jwks_url:
+            raise JWTError("JWKS_URL is not configured.")
+        try:
+            with urllib.request.urlopen(settings.jwks_url, timeout=5) as response:
+                _jwks_cache = json.loads(response.read().decode())
+                _jwks_cache_expiry = now + 3600  # cache 1 hour
+        except Exception as e:
+            logger.error(f"Failed to fetch JWKS from {settings.jwks_url}: {e}")
+            if _jwks_cache:
+                return _jwks_cache
+            raise JWTError(f"Failed to fetch JWKS: {e}") from e
+    return _jwks_cache
+
+
 @dataclass
 class CurrentUser:
     """Lightweight identity object extracted from a validated JWT."""
@@ -72,7 +98,36 @@ def get_current_user(
     algorithms = settings.jwt_algorithms if hasattr(settings, "jwt_algorithms") else [ALGORITHM]
 
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=algorithms)
+        unverified_header = jwt.get_unverified_header(token)
+        alg = unverified_header.get("alg")
+        kid = unverified_header.get("kid")
+    except JWTError as exc:
+        logger.warning(f"Failed to decode JWT headers: {exc}")
+        raise credentials_exc
+
+    if alg == "HS256":
+        key_to_use = settings.secret_key
+    elif alg in ("ES256", "RS256"):
+        if not kid:
+            logger.warning("JWT validation failed: 'kid' missing from asymmetric token header.")
+            raise credentials_exc
+        try:
+            jwks = get_jwks()
+            keys = jwks.get("keys", [])
+            jwk_dict = next((k for k in keys if k.get("kid") == kid), None)
+            if not jwk_dict:
+                logger.warning(f"JWT validation failed: No matching JWK found for kid '{kid}'.")
+                raise credentials_exc
+            key_to_use = jwk.construct(jwk_dict)
+        except JWTError as exc:
+            logger.warning(f"Asymmetric key extraction failed: {exc}")
+            raise credentials_exc
+    else:
+        logger.warning(f"Unsupported JWT algorithm: {alg}")
+        raise credentials_exc
+
+    try:
+        payload = jwt.decode(token, key_to_use, algorithms=algorithms)
     except ExpiredSignatureError:
         logger.warning("JWT validation failed: Access token has expired.")
         raise HTTPException(

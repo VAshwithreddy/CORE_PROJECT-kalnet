@@ -84,7 +84,14 @@ def run_tests():
                     body = req["body"].get("raw")
 
             if relative_url.endswith("/auth/login") and isinstance(body, dict):
-                body["username"] = "sarah.chen@kalnet.demo"
+                from src.core.database import SessionLocal
+                from src.models.person import Person
+                db = SessionLocal()
+                try:
+                    p = db.query(Person).first()
+                    body["username"] = p.email if p else "yusuf.khan@kalnet.demo"
+                finally:
+                    db.close()
 
             total_tests += 1
             try:
