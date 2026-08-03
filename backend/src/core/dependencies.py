@@ -1,9 +1,11 @@
 """
 FastAPI reusable dependencies.
 
-get_current_user — decodes the Bearer JWT issued by /auth/login and returns
-a lightweight CurrentUser dataclass that carries the caller's person_id and
-role.  Raise 401 for missing / invalid / expired tokens.
+get_current_user — decodes the Bearer JWT issued by /auth/login, looks up
+the matching Person record via auth_user_id, and returns a lightweight
+CurrentUser dataclass that carries the caller's real person_id (people.id,
+not the Supabase auth.users id) and role. Raise 401 for missing / invalid /
+expired tokens, or if no matching Person record exists.
 
 require_roles(*roles) — dependency factory that raises HTTP 403 when the
 authenticated user's role is not in the allowed set.
@@ -20,8 +22,10 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt, ExpiredSignatureError
+from sqlalchemy.orm import Session
 
 from src.core.config import settings
+from src.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +64,7 @@ def get_jwks() -> dict:
 
 @dataclass
 class CurrentUser:
-    """Lightweight identity object extracted from a validated JWT."""
+    """Lightweight identity object extracted from a validated JWT + Person lookup."""
     person_id: UUID
     email: str
     role: str
@@ -68,9 +72,11 @@ class CurrentUser:
 
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
 ) -> CurrentUser:
     """
-    Decode and validate the JWT Bearer token.
+    Decode and validate the JWT Bearer token, then resolve the real
+    `people.id` by looking up `people.auth_user_id == token sub claim`.
 
     In Swagger: click Authorize, paste just the token value (without 'Bearer ').
     Swagger adds the 'Bearer ' prefix automatically.
@@ -79,7 +85,8 @@ def get_current_user(
     - The Authorization header is missing.
     - The token signature is invalid.
     - The token has expired.
-    - The ``sub`` claim (person UUID) is absent or malformed.
+    - The ``sub`` claim (auth.users UUID) is absent or malformed.
+    - No Person record exists with matching auth_user_id.
     """
     if not credentials or not credentials.credentials:
         raise HTTPException(
@@ -127,7 +134,7 @@ def get_current_user(
         raise credentials_exc
 
     try:
-        payload = jwt.decode(token, key_to_use, algorithms=algorithms)
+        payload = jwt.decode(token, key_to_use, algorithms=algorithms, audience="authenticated")
     except ExpiredSignatureError:
         logger.warning("JWT validation failed: Access token has expired.")
         raise HTTPException(
@@ -151,9 +158,18 @@ def get_current_user(
         raise credentials_exc
 
     try:
-        person_id = UUID(sub)
+        auth_user_id = UUID(sub)
     except ValueError:
         logger.warning(f"JWT validation failed: 'sub' claim '{sub}' is not a valid UUID.")
+        raise credentials_exc
+
+    # --- Resolve the real people.id via auth_user_id lookup ---
+    # sub is Supabase's auth.users.id, NOT people.id. RLS/queries filter on
+    # people.id (assignments.person_id etc.), so we must look it up.
+    from src.models.person import Person
+    person = db.query(Person).filter(Person.auth_user_id == auth_user_id).first()
+    if not person:
+        logger.warning(f"JWT validation failed: no Person found with auth_user_id '{auth_user_id}'.")
         raise credentials_exc
 
     role = payload.get("role")
@@ -161,9 +177,12 @@ def get_current_user(
         app_meta = payload.get("app_metadata", {})
         user_meta = payload.get("user_metadata", {})
         role = app_meta.get("role") or user_meta.get("role") or "employee"
+    # Prefer the role stored on the Person record if available (source of truth)
+    if getattr(person, "role", None):
+        role = person.role.value if hasattr(person.role, "value") else str(person.role)
 
     return CurrentUser(
-        person_id=person_id,
+        person_id=person.id,
         email=payload.get("email", ""),
         role=str(role),
     )
