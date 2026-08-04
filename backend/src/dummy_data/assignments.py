@@ -1,0 +1,50 @@
+ASSIGNMENTS_DATA = [
+    {
+        "id": "a1111111-1111-4111-a111-111111111111",
+        "project_id": "b1111111-1111-4111-8111-111111111111",
+        "project_name": "CORE Platform MVP",
+        "assignee_id": "c1111111-1111-4111-8111-111111111111",
+        "assignee_name": "Alice Smith",
+        "assigned_by_id": "c2222222-2222-4222-8222-222222222222",
+        "assigned_by_name": "Bob Johnson",
+        "role": "developer",
+        "status": "active",
+        "allocation_percent": 80,
+        "start_date": "2026-01-15",
+        "end_date": "2026-09-30",
+        "notes": "Core backend development.",
+        "created_at": "2026-01-14T10:00:00"
+    },
+    {
+        "id": "a2222222-2222-4222-a222-222222222222",
+        "project_id": "b1111111-1111-4111-8111-111111111111",
+        "project_name": "CORE Platform MVP",
+        "assignee_id": "c2222222-2222-4222-8222-222222222222",
+        "assignee_name": "Bob Johnson",
+        "assigned_by_id": "c2222222-2222-4222-8222-222222222222",
+        "assigned_by_name": "Bob Johnson",
+        "role": "tech_lead",
+        "status": "active",
+        "allocation_percent": 50,
+        "start_date": "2026-01-01",
+        "end_date": "2026-09-30",
+        "notes": "Technical leadership and architecture decisions.",
+        "created_at": "2026-01-01T09:00:00"
+    },
+    {
+        "id": "a3333333-3333-4333-a333-333333333333",
+        "project_id": "b2222222-2222-4222-8222-222222222222",
+        "project_name": "Design System v2",
+        "assignee_id": "c3333333-3333-4333-8333-333333333333",
+        "assignee_name": "Carol Williams",
+        "assigned_by_id": "c3333333-3333-4333-8333-333333333333",
+        "assigned_by_name": "Carol Williams",
+        "role": "designer",
+        "status": "active",
+        "allocation_percent": 100,
+        "start_date": "2026-03-01",
+        "end_date": "2026-06-30",
+        "notes": "Lead designer for the design system overhaul.",
+        "created_at": "2026-02-20T09:00:00"
+    }
+]

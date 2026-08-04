@@ -1,4 +1,4 @@
-import type { UserRole } from "./auth";
+import type { UserRole } from "./roles";
 
 export type Permission =
   | "assignments:read"
