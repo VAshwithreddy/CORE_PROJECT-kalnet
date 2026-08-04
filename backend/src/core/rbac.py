@@ -5,7 +5,8 @@ Every access-control decision in the application should route through this
 module so that the business rules for each role live in exactly one place.
 
 Role hierarchy (most → least privileged):
-  system_admin > work_admin > executive > department_head
+  system_admin > work_admin > executive
+    > department_head (dept members)
     > team_leader (dept members)
     > manager     (direct reports)
     > employee    (self only)
@@ -27,14 +28,13 @@ from src.models.assignment import Assignment
 
 # Roles that may see ALL data in the system.
 PRIVILEGED_ROLES: Set[str] = {
-    "department_head",
     "executive",
     "work_admin",
     "system_admin",
 }
 
 # Roles that may see their own data PLUS a wider team.
-MANAGER_ROLES: Set[str] = {"manager", "team_leader"}
+MANAGER_ROLES: Set[str] = {"manager", "team_leader", "department_head"}
 
 
 class RBACService:
@@ -56,7 +56,7 @@ class RBACService:
 
         - Privileged roles → every person in the system.
         - manager          → self + persons whose manager_id == caller.
-        - team_leader      → self + members of the caller's department.
+        - team_leader / department_head → self + members of the caller's department.
         - employee         → self only.
         """
         role = current_user.role
@@ -79,7 +79,7 @@ class RBACService:
             )
             visible.update(r[0] for r in reports)
 
-        elif role == "team_leader":
+        elif role in ("team_leader", "department_head"):
             # Same-department members.
             caller = db.query(Person).filter(Person.id == uid).first()
             if caller and caller.department_id:
