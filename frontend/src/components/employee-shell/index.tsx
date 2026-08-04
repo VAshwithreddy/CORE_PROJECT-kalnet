@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import { AppShell } from "@/components/app-shell";
+import type { NavItem } from "@/components/app-shell";
+import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { getAssignmentsByOwner, getNotificationsByUser, subscribe } from "@/lib/mock-db";
 
 interface EmployeeShellProps {
   children: ReactNode;
-  /** Active path segment to highlight nav item. e.g. "/employee/home" */
   activePath?: string;
-  /** Breadcrumb elements for the topbar */
   breadcrumbs?: ReactNode;
-  /** Custom actions for the topbar */
   topbarActions?: ReactNode;
 }
 
@@ -18,105 +19,54 @@ export function EmployeeShell({
   breadcrumbs,
   topbarActions,
 }: EmployeeShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [assignmentCount, setAssignmentCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
 
-  const navItems = [
+  useEffect(() => {
+    // Initial fetch
+    setCurrentUser(getCurrentUser());
+    setAssignmentCount(getAssignmentsByOwner(getCurrentUser().id).filter(a => a.status !== "completed").length);
+    setNotificationCount(getNotificationsByUser(getCurrentUser().id).filter(n => !n.isRead).length);
+
+    const unsubSession = subscribeSession((user) => {
+      setCurrentUser(user);
+      setAssignmentCount(getAssignmentsByOwner(user.id).filter(a => a.status !== "completed").length);
+      setNotificationCount(getNotificationsByUser(user.id).filter(n => !n.isRead).length);
+    });
+
+    const unsubDb = subscribe(() => {
+      setAssignmentCount(getAssignmentsByOwner(getCurrentUser().id).filter(a => a.status !== "completed").length);
+      setNotificationCount(getNotificationsByUser(getCurrentUser().id).filter(n => !n.isRead).length);
+    });
+
+    return () => {
+      unsubSession();
+      unsubDb();
+    };
+  }, []);
+
+  const navItems: NavItem[] = [
     { label: "Home", href: "/employee/home", icon: "🏠" },
-    { label: "My Work", href: "/employee/my-work", icon: "📋", badge: 3 }, // Example badge
+    { label: "My Work", href: "/employee/my-work", icon: "📋", badge: assignmentCount > 0 ? assignmentCount : undefined },
     { label: "Requests", href: "/employee/requests", icon: "📨" },
-    { label: "Notifications", href: "/employee/notifications", icon: "🔔", badge: 1 },
+    { label: "Notifications", href: "/employee/notifications", icon: "🔔", badge: notificationCount > 0 ? notificationCount : undefined },
     { label: "Profile", href: "/employee/profile", icon: "👤" },
   ];
 
   return (
-    <div className="app-shell">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 90 }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={`app-shell__sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="app-shell__sidebar-header">
-          <div className="app-shell__logo">C</div>
-          <div>
-            <div className="app-shell__product-name">CORE</div>
-            <div className="app-shell__role-label">Employee Workspace</div>
-          </div>
-        </div>
-
-        <nav className="app-shell__nav" aria-label="Main navigation">
-          <div className="app-shell__nav-section">
-            <div className="app-shell__nav-section-label">Personal</div>
-            {navItems.map((item) => {
-              const isActive = activePath.startsWith(item.href);
-              return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className={`app-shell__nav-link ${isActive ? "active" : ""}`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <span className="app-shell__nav-icon" aria-hidden="true">{item.icon}</span>
-                  {item.label}
-                  {item.badge ? (
-                    <span className="app-shell__nav-badge" aria-label={`${item.badge} unread items`}>
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </a>
-              );
-            })}
-          </div>
-        </nav>
-
-        <div className="app-shell__sidebar-footer">
-          <button type="button" className="app-shell__user-button">
-            <div className="app-shell__avatar">JD</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="app-shell__user-name">Jane Doe</div>
-              <div className="app-shell__user-role">Frontend Engineer</div>
-            </div>
-            <span aria-hidden="true" style={{ color: "var(--core-text-subtle)" }}>⋮</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="app-shell__main">
-        <header className="app-shell__topbar">
-          <button
-            type="button"
-            className="core-button core-button-ghost core-button-icon app-shell__menu-button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open navigation"
-          >
-            ☰
-          </button>
-
-          <div className="app-shell__topbar-breadcrumb">
-            {breadcrumbs}
-          </div>
-
-          <button type="button" className="app-shell__search-trigger" aria-label="Search command palette">
-            <span aria-hidden="true">🔍</span> Search CORE...
-            <span className="app-shell__search-kbd">Ctrl K</span>
-          </button>
-
-          {topbarActions && (
-            <div className="app-shell__topbar-actions">
-              {topbarActions}
-            </div>
-          )}
-        </header>
-
-        <main className="app-shell__content">
-          {children}
-        </main>
-      </div>
-    </div>
+    <AppShell
+      activePath={activePath}
+      breadcrumbs={breadcrumbs}
+      topbarActions={topbarActions}
+      navSections={[{ label: "Personal", items: navItems }]}
+      brand={{
+        logoLetter: "C",
+        productName: "CORE",
+        roleLabel: "Employee Workspace"
+      }}
+    >
+      {children}
+    </AppShell>
   );
 }

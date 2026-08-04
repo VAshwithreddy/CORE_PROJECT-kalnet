@@ -1,0 +1,17 @@
+workspace:
+  id: ac1848e1-dc2c-423c-86f4-07409a17b66d
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../backend/postman_collection.json: 56653442-380c7d8c-c656-4338-a339-0d949e824697
+    ../postman/collections/CORE - Phase 1 Backend Copy: c9371716-d56f-41eb-8ee8-8cae59bea3cc
+    ../postman/collections/CORE - Phase 1 Backend Copy 2: e5d6e1c3-0b59-4ca8-9b1d-f380d1e9c1ac
+    ../postman/collections/CORE - Phase 1 Backend: e668833e-2f20-46be-a4b2-8bca5299b112
+    ../postman/collections/CORE - Phase 1 Backend Copy 3: 49c28f01-063f-44db-a04b-abec4d707d46
+    ../postman/collections/CORE - Phase 1 Backend Copy 4: a9f3c8c6-7fdd-4106-b76d-07c320626995
+
+localResources:
+  collections:
+    - ../backend/postman_collection.json
