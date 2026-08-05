@@ -6,6 +6,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi.testclient import TestClient
 from src.main import app
+from src.core.dependencies import get_current_user, CurrentUser
+from uuid import uuid4
+
+# Override auth dependency so tests don't fail with 403 Forbidden
+app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+    person_id=uuid4(), email="admin@example.com", role="system_admin"
+)
 
 client = TestClient(app)
 

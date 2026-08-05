@@ -20,7 +20,7 @@ class ProjectResponse(BaseModel):
 
     target_date: Optional[date] = None
 
-    metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_")
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias="metadata_")
 
     created_at: datetime
 
@@ -45,7 +45,7 @@ class ProjectCreate(BaseModel):
     due_date: Optional[date] = None
     target_date: Optional[date] = None
 
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, alias="metadata_")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     class Config:
         populate_by_name = True
@@ -67,7 +67,8 @@ class ProjectUpdate(BaseModel):
     due_date: Optional[date] = None
     target_date: Optional[date] = None
 
-    metadata: Optional[Dict[str, Any]] = Field(None, alias="metadata_")
+    metadata: Optional[Dict[str, Any]] = None
 
     class Config:
         populate_by_name = True
+

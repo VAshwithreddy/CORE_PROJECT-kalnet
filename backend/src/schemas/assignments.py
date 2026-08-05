@@ -27,12 +27,12 @@ class AssignmentResponse(BaseModel):
         from_attributes = True
 
 
-from typing import Optional, Any
+from typing import Optional, Any, Annotated
 from pydantic import BaseModel, Field
 
 class AssignmentCreate(BaseModel):
     project_id: Any
-    person_id: Optional[Any] = Field(None, alias="assignee_id")
+    person_id: Optional[Any] = None
     assignee_id: Optional[Any] = None
     assigned_by_id: Optional[Any] = None
 
