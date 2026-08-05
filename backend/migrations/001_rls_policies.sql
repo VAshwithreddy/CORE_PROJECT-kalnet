@@ -8,6 +8,18 @@
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
+-- 0. Security Definer Helper Functions (Avoid RLS Infinite Recursion)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_user_department_id(p_user_id text)
+RETURNS uuid
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT department_id FROM people WHERE id::text = p_user_id LIMIT 1;
+$$;
+
+-- ------------------------------------------------------------------------------
 -- 1. Enable RLS on core tables
 -- ------------------------------------------------------------------------------
 ALTER TABLE people ENABLE ROW LEVEL SECURITY;
@@ -18,14 +30,14 @@ ALTER TABLE status_updates ENABLE ROW LEVEL SECURITY;
 -- ------------------------------------------------------------------------------
 -- 2. People Table Policies
 -- ------------------------------------------------------------------------------
--- Privileged roles can see all people
+DROP POLICY IF EXISTS people_privileged_policy ON people;
 CREATE POLICY people_privileged_policy ON people
     FOR SELECT
     USING (
         current_setting('app.current_user_role', true) IN ('department_head', 'executive', 'work_admin', 'system_admin')
     );
 
--- Employee can see themselves
+DROP POLICY IF EXISTS people_employee_policy ON people;
 CREATE POLICY people_employee_policy ON people
     FOR SELECT
     USING (
@@ -33,7 +45,7 @@ CREATE POLICY people_employee_policy ON people
         AND id::text = current_setting('app.current_user_id', true)
     );
 
--- Manager can see themselves and direct reports
+DROP POLICY IF EXISTS people_manager_policy ON people;
 CREATE POLICY people_manager_policy ON people
     FOR SELECT
     USING (
@@ -45,29 +57,28 @@ CREATE POLICY people_manager_policy ON people
     );
 
 -- Team leader can see themselves and their department members
+DROP POLICY IF EXISTS people_team_leader_policy ON people;
 CREATE POLICY people_team_leader_policy ON people
     FOR SELECT
     USING (
         current_setting('app.current_user_role', true) = 'team_leader'
         AND (
             id::text = current_setting('app.current_user_id', true)
-            OR department_id = (
-                SELECT department_id FROM people WHERE id::text = current_setting('app.current_user_id', true) LIMIT 1
-            )
+            OR department_id = get_user_department_id(current_setting('app.current_user_id', true))
         )
     );
 
 -- ------------------------------------------------------------------------------
 -- 3. Assignments Table Policies
 -- ------------------------------------------------------------------------------
--- Privileged roles can see all assignments
+DROP POLICY IF EXISTS assignments_privileged_policy ON assignments;
 CREATE POLICY assignments_privileged_policy ON assignments
     FOR SELECT
     USING (
         current_setting('app.current_user_role', true) IN ('department_head', 'executive', 'work_admin', 'system_admin')
     );
 
--- Employee can see their own assignments
+DROP POLICY IF EXISTS assignments_employee_policy ON assignments;
 CREATE POLICY assignments_employee_policy ON assignments
     FOR SELECT
     USING (
@@ -75,7 +86,7 @@ CREATE POLICY assignments_employee_policy ON assignments
         AND person_id::text = current_setting('app.current_user_id', true)
     );
 
--- Manager can see assignments for themselves and direct reports
+DROP POLICY IF EXISTS assignments_manager_policy ON assignments;
 CREATE POLICY assignments_manager_policy ON assignments
     FOR SELECT
     USING (
@@ -86,21 +97,20 @@ CREATE POLICY assignments_manager_policy ON assignments
     );
 
 -- Team leader can see assignments for themselves and their department members
+DROP POLICY IF EXISTS assignments_team_leader_policy ON assignments;
 CREATE POLICY assignments_team_leader_policy ON assignments
     FOR SELECT
     USING (
         current_setting('app.current_user_role', true) = 'team_leader'
         AND person_id IN (
-            SELECT id FROM people WHERE id::text = current_setting('app.current_user_id', true) OR department_id = (
-                SELECT department_id FROM people WHERE id::text = current_setting('app.current_user_id', true) LIMIT 1
-            )
+            SELECT id FROM people WHERE id::text = current_setting('app.current_user_id', true) OR department_id = get_user_department_id(current_setting('app.current_user_id', true))
         )
     );
 
 -- ------------------------------------------------------------------------------
 -- 4. Status Updates Table Policies
 -- ------------------------------------------------------------------------------
--- Can see a status update if they can see the assignment
+DROP POLICY IF EXISTS status_updates_select_policy ON status_updates;
 CREATE POLICY status_updates_select_policy ON status_updates
     FOR SELECT
     USING (
@@ -112,14 +122,14 @@ CREATE POLICY status_updates_select_policy ON status_updates
 -- ------------------------------------------------------------------------------
 -- 5. Projects Table Policies
 -- ------------------------------------------------------------------------------
--- Privileged roles can see all projects
+DROP POLICY IF EXISTS projects_privileged_policy ON projects;
 CREATE POLICY projects_privileged_policy ON projects
     FOR SELECT
     USING (
         current_setting('app.current_user_role', true) IN ('department_head', 'executive', 'work_admin', 'system_admin')
     );
 
--- Users can see projects they are assigned to
+DROP POLICY IF EXISTS projects_assigned_policy ON projects;
 CREATE POLICY projects_assigned_policy ON projects
     FOR SELECT
     USING (
