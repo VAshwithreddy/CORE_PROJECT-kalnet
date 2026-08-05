@@ -122,8 +122,8 @@ let currentUser: CoreUser | null = loadUser();
 type Listener = (user: CoreUser) => void;
 const listeners = new Set<Listener>();
 
-export function getCurrentUser(): CoreUser | null {
-  return currentUser;
+export function getCurrentUser(): CoreUser {
+  return currentUser || DEMO_USERS[0];
 }
 
 export function isAuthenticatedUser(): boolean {
