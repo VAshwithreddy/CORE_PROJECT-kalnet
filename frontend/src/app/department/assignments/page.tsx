@@ -71,13 +71,15 @@ export default function AssignmentsPage() {
 
   useEffect(() => {
     setMounted(true);
-    setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
+    const cu = getCurrentUser();
+    if (!cu) return;
+    setAssignments(getAssignmentsByDepartment(cu.departmentId));
     
     // Load projects and team members for dropdowns
-    const deptProjects = getProjects().filter(p => !p.departmentId || p.departmentId === getCurrentUser().departmentId);
+    const deptProjects = getProjects().filter(p => !p.departmentId || p.departmentId === cu.departmentId);
     setProjects(deptProjects.map(p => ({ value: p.name, label: p.name })));
     
-    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === getCurrentUser().departmentId);
+    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === cu.departmentId);
     setTeamMembers(team.map(m => ({ value: m.id, label: m.name })));
 
     const unsubSession = subscribeSession((user) => {
@@ -95,7 +97,9 @@ export default function AssignmentsPage() {
     });
 
     const unsubDb = subscribe(() => {
-      setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
+      const cu2 = getCurrentUser();
+      if (!cu2) return;
+      setAssignments(getAssignmentsByDepartment(cu2.departmentId));
     });
 
     return () => {
