@@ -163,6 +163,10 @@ export default function AssignmentsPage() {
       alert("Please fill in all required fields.");
       return;
     }
+    if (!currentUser) {
+      alert("Could not determine current user; please sign in.");
+      return;
+    }
     
     const ownerName = teamMembers.find(m => m.value === newTaskOwner)?.label || newTaskOwner;
     
