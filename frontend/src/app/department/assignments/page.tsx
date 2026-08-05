@@ -336,7 +336,7 @@ export default function AssignmentsPage() {
         isOpen={isNewTaskOpen}
         onClose={() => setIsNewTaskOpen(false)}
         title="Create New Task"
-        subtitle={`Department: ${currentUser.departmentName}`}
+        subtitle={`Department: ${currentUser?.departmentName ?? '—'}`}
       >
         <DrawerSection title="Task Details">
           <TextInput
