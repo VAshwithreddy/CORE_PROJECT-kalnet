@@ -54,7 +54,7 @@ export default function AssignmentsPage() {
   
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<CoreUser | null>(getCurrentUser());
 
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -106,6 +106,7 @@ export default function AssignmentsPage() {
 
   // Update selectedAssignment if list updates in DB
   useEffect(() => {
+    if (!currentUser) return;
     if (selectedAssignment) {
       const fresh = getAssignmentsByDepartment(currentUser.departmentId).find((a) => a.id === selectedAssignment.id);
       setSelectedAssignment(fresh || null);
