@@ -54,7 +54,7 @@ export default function AssignmentsPage() {
   
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<CoreUser | null>(getCurrentUser());
 
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -71,13 +71,15 @@ export default function AssignmentsPage() {
 
   useEffect(() => {
     setMounted(true);
-    setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
+    const cu = getCurrentUser();
+    if (!cu) return;
+    setAssignments(getAssignmentsByDepartment(cu.departmentId));
     
     // Load projects and team members for dropdowns
-    const deptProjects = getProjects().filter(p => !p.departmentId || p.departmentId === getCurrentUser().departmentId);
+    const deptProjects = getProjects().filter(p => !p.departmentId || p.departmentId === cu.departmentId);
     setProjects(deptProjects.map(p => ({ value: p.name, label: p.name })));
     
-    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === getCurrentUser().departmentId);
+    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === cu.departmentId);
     setTeamMembers(team.map(m => ({ value: m.id, label: m.name })));
 
     const unsubSession = subscribeSession((user) => {
@@ -95,7 +97,9 @@ export default function AssignmentsPage() {
     });
 
     const unsubDb = subscribe(() => {
-      setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
+      const cu2 = getCurrentUser();
+      if (!cu2) return;
+      setAssignments(getAssignmentsByDepartment(cu2.departmentId));
     });
 
     return () => {
@@ -106,6 +110,7 @@ export default function AssignmentsPage() {
 
   // Update selectedAssignment if list updates in DB
   useEffect(() => {
+    if (!currentUser) return;
     if (selectedAssignment) {
       const fresh = getAssignmentsByDepartment(currentUser.departmentId).find((a) => a.id === selectedAssignment.id);
       setSelectedAssignment(fresh || null);
@@ -156,6 +161,10 @@ export default function AssignmentsPage() {
   const handleCreateTask = () => {
     if (!newTaskTitle || !newTaskProject || !newTaskOwner) {
       alert("Please fill in all required fields.");
+      return;
+    }
+    if (!currentUser) {
+      alert("Could not determine current user; please sign in.");
       return;
     }
     
@@ -327,7 +336,7 @@ export default function AssignmentsPage() {
         isOpen={isNewTaskOpen}
         onClose={() => setIsNewTaskOpen(false)}
         title="Create New Task"
-        subtitle={`Department: ${currentUser.departmentName}`}
+        subtitle={`Department: ${currentUser?.departmentName ?? '—'}`}
       >
         <DrawerSection title="Task Details">
           <TextInput
