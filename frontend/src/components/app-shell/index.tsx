@@ -3,8 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { RoleSwitcher } from "@/components/role-switcher";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { getCurrentUser, subscribeSession, logoutUser, type CoreUser } from "@/lib/mock-session";
 import { canAccessRoute } from "@/lib/route-policy";
 
 export interface NavItem {
@@ -62,25 +61,36 @@ export function AppShell({
   scopeBar,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
-    return subscribeSession((newUser) => setCurrentUser(newUser));
+    return subscribeSession((newUser) => {
+      if (newUser) setCurrentUser(newUser);
+    });
   }, []);
 
   useEffect(() => {
-    // Only guard routes if we're not already on the forbidden page
-    if (pathname && !pathname.startsWith("/forbidden")) {
+    if (pathname && !pathname.startsWith("/forbidden") && !pathname.startsWith("/login") && pathname !== "/") {
       if (!canAccessRoute(pathname, currentUser.role)) {
         router.replace("/forbidden");
       }
     }
-  }, [pathname, currentUser.role, router]);
+  }, [pathname, currentUser, router]);
 
-  const displayUser = user || currentUser;
+  const handleLogout = () => {
+    logoutUser();
+    router.replace("/login");
+  };
+
+  const displayUser = user || currentUser || {
+    initials: "??",
+    name: "Guest User",
+    role: "employee",
+  };
 
   return (
     <div className="app-shell">
@@ -134,8 +144,53 @@ export function AppShell({
           ))}
         </nav>
 
-        <div className="app-shell__sidebar-footer">
-          <button type="button" className="app-shell__user-button">
+        <div className="app-shell__sidebar-footer" style={{ position: "relative" }}>
+          {userMenuOpen && (
+            <div style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 12,
+              right: 12,
+              marginBottom: 8,
+              background: "var(--core-surface)",
+              border: "1px solid var(--core-border)",
+              borderRadius: "var(--core-radius-md)",
+              boxShadow: "var(--core-shadow-lg)",
+              padding: 6,
+              zIndex: 100,
+            }}>
+              <div style={{ padding: "6px 8px", fontSize: "11px", fontWeight: 600, color: "var(--core-text-muted)", textTransform: "uppercase" }}>
+                Session Controls
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 10px",
+                  background: "var(--core-danger-soft)",
+                  color: "var(--core-danger)",
+                  border: "none",
+                  borderRadius: "var(--core-radius-sm)",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  textAlign: "left",
+                }}
+              >
+                <span>🚪</span> Sign Out
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="app-shell__user-button"
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+          >
             <div className="app-shell__avatar">{displayUser.initials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="app-shell__user-name">{displayUser.name}</div>
@@ -186,7 +241,6 @@ export function AppShell({
           {children}
         </main>
       </div>
-      <RoleSwitcher />
     </div>
   );
 }
