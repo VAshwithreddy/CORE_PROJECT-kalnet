@@ -11,6 +11,7 @@
  */
 
 import type { ReactNode } from "react";
+import { Icon } from "@/components/core-icons";
 
 export type MetricTrend = "up" | "down" | "neutral";
 
@@ -45,9 +46,9 @@ interface MetricCardProps {
 }
 
 function ChangeIcon({ trend }: { trend: MetricTrend }) {
-  if (trend === "up") return <span aria-hidden="true">↑</span>;
-  if (trend === "down") return <span aria-hidden="true">↓</span>;
-  return <span aria-hidden="true">→</span>;
+  if (trend === "up") return <Icon name="trendUp" size={13} />;
+  if (trend === "down") return <Icon name="trendDown" size={13} />;
+  return <span aria-hidden="true">=</span>;
 }
 
 function MetricCardInner({
@@ -83,7 +84,7 @@ function MetricCardInner({
       {children ? (
         children
       ) : (
-        <span className="metric-card__value">{value ?? "—"}</span>
+        <span className="metric-card__value">{value ?? "-"}</span>
       )}
 
       {change !== undefined && (

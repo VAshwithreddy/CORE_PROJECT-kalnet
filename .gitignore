@@ -25,6 +25,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+frontend/.next-dev*.log
+frontend/.npm-cache/
 
 # Editors and OS files
 .vscode/

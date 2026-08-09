@@ -40,6 +40,7 @@
 import { useState, useMemo, useCallback, Fragment, type ReactNode } from "react";
 import { SkeletonTableRows } from "@/components/loading-skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { Icon } from "@/components/core-icons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ function RowActionMenu<T>({ row, actions }: { row: T; actions: RowAction<T>[] })
         aria-haspopup="menu"
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
       >
-        ⋯
+        <Icon name="more" size={16} />
       </button>
       {open && (
         <>
@@ -344,10 +345,10 @@ export function DataTable<T>({
 
         {!disableSearch && (
           <div className="data-table-toolbar__search">
-            <span aria-hidden="true">🔍</span>
+            <Icon name="search" size={15} />
             <input
               type="search"
-              placeholder="Search…"
+              placeholder="Search..."
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               aria-label={`Search ${title ?? "records"}`}
@@ -424,7 +425,7 @@ export function DataTable<T>({
                   {col.header}
                   {col.sortable && (
                     <span className="data-table__sort-icon" aria-hidden="true">
-                      {sortKey === col.key ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                      {sortKey === col.key ? (sortDir === "asc" ? "^" : "v") : "-"}
                     </span>
                   )}
                 </th>
@@ -445,7 +446,7 @@ export function DataTable<T>({
               <tr>
                 <td colSpan={colCount}>
                   <EmptyState
-                    icon={emptyState?.icon ?? "📋"}
+                    icon={emptyState?.icon ?? <Icon name="clipboard" />}
                     title={emptyState?.title ?? "No records found"}
                     body={
                       emptyState?.body ??
@@ -492,7 +493,7 @@ export function DataTable<T>({
                             aria-label={isExpanded ? "Collapse row" : "Expand row"}
                             style={{ fontSize: 12 }}
                           >
-                            {isExpanded ? "▼" : "▶"}
+                            <Icon name={isExpanded ? "chevronDown" : "chevronRight"} size={14} />
                           </button>
                         </td>
                       )}
@@ -534,7 +535,7 @@ export function DataTable<T>({
           <span className="data-table-pagination__info">
             {total === 0
               ? "No records"
-              : `${startRecord}–${endRecord} of ${total}`}
+              : `${startRecord}-${endRecord} of ${total}`}
           </span>
 
           <div className="data-table-pagination__controls" role="navigation" aria-label="Pagination">
@@ -548,7 +549,7 @@ export function DataTable<T>({
               disabled={page === 1}
               aria-label="Previous page"
             >
-              ‹
+              &lt;
             </button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -560,18 +561,18 @@ export function DataTable<T>({
                   Math.abs(p - page) <= 1
                 );
               })
-              .reduce<Array<number | "…">>((acc, p, idx, arr) => {
+              .reduce<Array<number | "...">>((acc, p, idx, arr) => {
                 if (idx > 0) {
                   const prev = arr[idx - 1];
-                  if (typeof prev === "number" && p - prev > 1) acc.push("…");
+                  if (typeof prev === "number" && p - prev > 1) acc.push("...");
                 }
                 acc.push(p);
                 return acc;
               }, [])
               .map((p, i) =>
-                p === "…" ? (
+                p === "..." ? (
                   <span key={`ellipsis-${i}`} style={{ padding: "0 4px", color: "var(--core-text-subtle)" }}>
-                    …
+                    ...
                   </span>
                 ) : (
                   <button
@@ -599,7 +600,7 @@ export function DataTable<T>({
               disabled={page === totalPages}
               aria-label="Next page"
             >
-              ›
+              &gt;
             </button>
           </div>
 

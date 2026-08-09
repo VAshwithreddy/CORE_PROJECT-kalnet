@@ -95,16 +95,87 @@ export default function DepartmentHomePage() {
     );
   }
 
+  const departmentMembers = getTeamMembers().filter(
+    (member) => !member.departmentId || member.departmentId === currentUser.departmentId,
+  );
+  const activeProjects = projects.filter((project) => project.status !== "completed").length;
+
   return (
     <DepartmentShell activePath="/department/home">
       <PageHeader
         title={`${currentUser.departmentName} Overview`}
         description={`Welcome back, ${currentUser.name.split(' ')[0]}. Here is the high-level status of your department.`}
+        meta={
+          <>
+            <span>{activeProjects} active projects</span>
+            <span>{blockerCount} blockers</span>
+            <span>{departmentMembers.length} team members</span>
+          </>
+        }
         primaryAction={{ label: "New Project", href: "/department/projects?new=true" }}
         secondaryActions={[
           { label: "Reset Demo Data", onClick: handleReset, variant: "ghost" }
         ]}
       />
+
+      <div className="workbench-grid">
+        <div className="core-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+            <div>
+              <h2>Priority Project Queue</h2>
+              <p>Projects needing department-head attention this week.</p>
+            </div>
+            <a className="core-button core-button-sm" href="/department/projects">Open Projects</a>
+          </div>
+          <ul className="mini-list">
+            {projects
+              .filter((project) => project.status !== "completed")
+              .slice(0, 4)
+              .map((project) => (
+                <li key={project.id} className="mini-list__item">
+                  <span>
+                    <span className="mini-list__title">{project.name}</span>
+                    <span className="mini-list__meta">{project.owner} - {project.nextMilestone}</span>
+                  </span>
+                  <StatusBadge status={healthStatusMap[project.health]} size="sm" label={project.health} />
+                </li>
+              ))}
+          </ul>
+        </div>
+
+        <div className="core-panel">
+          <h2>Capacity Snapshot</h2>
+          <p>Team availability bands from the live workspace model.</p>
+          {[
+            {
+              label: "Healthy",
+              value: departmentMembers.filter((member) => member.loadBand === "healthy").length,
+              className: "",
+            },
+            {
+              label: "Near full",
+              value: departmentMembers.filter((member) => member.loadBand === "full").length,
+              className: "capacity-fill--warning",
+            },
+            {
+              label: "Overload",
+              value: departmentMembers.filter((member) => member.loadBand === "overloaded").length,
+              className: "capacity-fill--danger",
+            },
+          ].map((row) => {
+            const total = Math.max(1, departmentMembers.length);
+            return (
+              <div className="capacity-row" key={row.label}>
+                <span>{row.label}</span>
+                <span className="capacity-track">
+                  <span className={`capacity-fill ${row.className}`} style={{ width: `${(row.value / total) * 100}%` }} />
+                </span>
+                <strong>{row.value}</strong>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="core-grid-4" style={{ marginBottom: 32 }}>
         {metrics.map((m) => (

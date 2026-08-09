@@ -177,6 +177,13 @@ export default function ExecutiveOverviewPage() {
         <PageHeader
           title="Executive Overview"
           description="Live organizational database metrics, strategic initiatives, and department performance."
+          meta={
+            <>
+              <span>{summary.active_projects} active projects</span>
+              <span>{summary.blocked_assignments} blockers</span>
+              <span>{summary.total_departments} departments</span>
+            </>
+          }
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
           <span style={{ display: "inline-flex", color: "var(--core-text-subtle)" }}>

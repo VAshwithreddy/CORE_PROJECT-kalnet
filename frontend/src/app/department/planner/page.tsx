@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { DepartmentShell } from "@/components/department-shell";
+import { Icon } from "@/components/core-icons";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
@@ -47,10 +48,11 @@ function plannerBadgeStatus(label: string): BadgeStatus {
 }
 
 const STATUS_COLUMNS = ["To Do", "Doing", "Blocked", "Done"] as const;
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 
 export default function PlannerPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [view, setView] = useState<"person" | "status">("person");
+  const [view, setView] = useState<"person" | "status">("status");
 
   const sync = useCallback(() => {
     setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
@@ -141,7 +143,7 @@ export default function PlannerPage() {
           title="Cycle status"
           onClick={() => cycleStatus(item)}
         >
-          ↻
+          <Icon name="shuffle" size={14} />
         </button>
       </div>
       <div style={{ fontWeight: 600, marginBottom: 12 }}>{item.title}</div>
@@ -180,8 +182,8 @@ export default function PlannerPage() {
       key={heading}
       className="core-panel"
       style={{
-        minWidth: 320,
-        flex: "0 0 320px",
+        minWidth: view === "status" ? 0 : 320,
+        flex: view === "status" ? undefined : "0 0 320px",
         display: "flex",
         flexDirection: "column",
         gap: 16,
@@ -251,11 +253,56 @@ export default function PlannerPage() {
         ))}
       </div>
 
+      <div className="core-panel" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div>
+            <h2>Weekly Capacity Matrix</h2>
+            <p>Fast planning view for who is carrying what across the week.</p>
+          </div>
+          <span className="core-status">Week 32</span>
+        </div>
+        <div className="schedule-grid" role="table" aria-label="Weekly capacity matrix">
+          <div className="schedule-grid__head">Person</div>
+          {WEEKDAYS.map((day) => (
+            <div key={day} className="schedule-grid__head">{day}</div>
+          ))}
+          {owners.slice(0, 5).map((owner, ownerIndex) => {
+            const ownerItems = getByOwner(owner);
+            return (
+              <Fragment key={owner}>
+                <div key={`${owner}-person`} className="schedule-grid__person">
+                  <span>{owner}</span>
+                  <span className="mini-list__meta">{ownerItems.length} items</span>
+                </div>
+                {WEEKDAYS.map((day, dayIndex) => {
+                  const item = ownerItems[(ownerIndex + dayIndex) % Math.max(1, ownerItems.length)];
+                  return (
+                    <div key={`${owner}-${day}`} className="schedule-grid__cell">
+                      {item ? (
+                        <span
+                          className={`schedule-pill${item.status === "blocked" ? " schedule-pill--blocked" : item.status === "completed" ? " schedule-pill--done" : ""}`}
+                          title={item.title}
+                        >
+                          {plannerLabel(item.status)} - {item.progress}%
+                        </span>
+                      ) : (
+                        <span className="mini-list__meta">Open capacity</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            );
+          })}
+        </div>
+      </div>
+
       <div
         style={{
-          display: "flex",
+          display: view === "status" ? "grid" : "flex",
+          gridTemplateColumns: view === "status" ? "repeat(auto-fit, minmax(230px, 1fr))" : undefined,
           gap: 24,
-          overflowX: "auto",
+          overflowX: view === "status" ? "visible" : "auto",
           paddingBottom: 24,
           alignItems: "flex-start",
         }}
