@@ -28,11 +28,21 @@ const columns: DataTableColumn<typeof triageQueue[0]>[] = [
 ];
 
 export default function WorkAdminHomePage() {
+  const triageCount = triageQueue.length;
+  const highPriorityCount = triageQueue.filter((item) => item.priority === "High").length;
+
   return (
     <WorkAdminShell activePath="/work-admin/home">
       <PageHeader
         title="Operations Dashboard"
         description="Monitor system-wide work routing and SLA compliance."
+        meta={
+          <>
+            <span>{triageCount} triage items</span>
+            <span>{highPriorityCount} high priority</span>
+            <span>Live routing view</span>
+          </>
+        }
       />
 
       <div className="core-grid-4" style={{ marginBottom: 32 }}>

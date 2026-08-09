@@ -3,6 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
+import { Icon } from "@/components/core-icons";
 import { getCurrentUser, subscribeSession } from "@/lib/mock-session";
 import { getRequests, subscribe } from "@/lib/mock-db";
 
@@ -33,13 +34,13 @@ export function WorkAdminShell({
   }, []);
 
   const navItems: NavItem[] = [
-    { label: "Home", href: "/work-admin/home", icon: "📊" },
-    { label: "Intake", href: "/work-admin/intake", icon: "📥", badge: intakeBadge > 0 ? intakeBadge : undefined },
-    { label: "Routing", href: "/work-admin/routing", icon: "🔀" },
-    { label: "Department Heads", href: "/work-admin/department-heads", icon: "👥" },
-    { label: "Approvals", href: "/work-admin/approvals", icon: "✅" },
-    { label: "Escalations", href: "/work-admin/escalations", icon: "🚨", badgeType: "danger" as const },
-    { label: "Audit", href: "/work-admin/audit", icon: "📜" },
+    { label: "Home", href: "/work-admin/home", icon: <Icon name="chart" /> },
+    { label: "Intake", href: "/work-admin/intake", icon: <Icon name="inbox" />, badge: intakeBadge > 0 ? intakeBadge : undefined },
+    { label: "Routing", href: "/work-admin/routing", icon: <Icon name="shuffle" /> },
+    { label: "Department Heads", href: "/work-admin/department-heads", icon: <Icon name="users" /> },
+    { label: "Approvals", href: "/work-admin/approvals", icon: <Icon name="check" /> },
+    { label: "Escalations", href: "/work-admin/escalations", icon: <Icon name="alert" />, badgeType: "danger" as const },
+    { label: "Audit", href: "/work-admin/audit", icon: <Icon name="report" /> },
   ];
 
   const user = getCurrentUser();
@@ -53,6 +54,8 @@ export function WorkAdminShell({
       brand={{
         logoLetter: "C",
         logoColor: "var(--core-warning)",
+        accentColor: "var(--core-warning)",
+        accentSoft: "var(--core-warning-soft)",
         productName: "CORE",
         roleLabel: "Work Administration",
       }}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getCurrentUser, subscribeSession, logoutUser, type CoreUser } from "@/lib/mock-session";
+import { DEMO_USERS, getCurrentUser, subscribeSession, logoutUser, type CoreUser } from "@/lib/mock-session";
 import { canAccessRoute } from "@/lib/route-policy";
+import { Icon } from "@/components/core-icons";
 
 export interface NavItem {
   label: string;
@@ -28,6 +29,8 @@ export interface AppShellUser {
 export interface AppShellBrand {
   logoLetter: string;
   logoColor?: string;
+  accentColor?: string;
+  accentSoft?: string;
   productName: string;
   roleLabel: string;
 }
@@ -62,24 +65,27 @@ export function AppShell({
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<CoreUser>(DEMO_USERS[0]);
+  const [sessionReady, setSessionReady] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
+    setSessionReady(true);
     return subscribeSession((newUser) => {
       if (newUser) setCurrentUser(newUser);
     });
   }, []);
 
   useEffect(() => {
+    if (!sessionReady) return;
     if (pathname && !pathname.startsWith("/forbidden") && !pathname.startsWith("/login") && pathname !== "/") {
       if (!canAccessRoute(pathname, currentUser.role)) {
         router.replace("/forbidden");
       }
     }
-  }, [pathname, currentUser, router]);
+  }, [pathname, currentUser, router, sessionReady]);
 
   const handleLogout = () => {
     logoutUser();
@@ -92,8 +98,13 @@ export function AppShell({
     role: "employee",
   };
 
+  const shellStyle = {
+    ["--core-shell-accent" as any]: brand.accentColor || brand.logoColor || "var(--core-brand)",
+    ["--core-shell-accent-soft" as any]: brand.accentSoft || "var(--core-brand-soft)",
+  } as CSSProperties;
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={shellStyle}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -181,7 +192,7 @@ export function AppShell({
                   textAlign: "left",
                 }}
               >
-                <span>🚪</span> Sign Out
+                <Icon name="logout" size={15} /> Sign Out
               </button>
             </div>
           )}
@@ -198,7 +209,7 @@ export function AppShell({
                 {(displayUser as any).roleLabel || displayUser.role}
               </div>
             </div>
-            <span aria-hidden="true" style={{ color: "var(--core-text-subtle)" }}>⋮</span>
+            <Icon name="more" size={16} style={{ color: "var(--core-text-subtle)" }} />
           </button>
         </div>
       </aside>
@@ -212,7 +223,7 @@ export function AppShell({
             onClick={() => setSidebarOpen(true)}
             aria-label="Open navigation"
           >
-            ☰
+            <Icon name="menu" size={18} />
           </button>
 
           <div className="app-shell__topbar-breadcrumb">
@@ -220,7 +231,7 @@ export function AppShell({
           </div>
 
           <button type="button" className="app-shell__search-trigger" aria-label="Search command palette">
-            <span aria-hidden="true">🔍</span> Search CORE...
+            <Icon name="search" size={16} /> Search CORE...
             <span className="app-shell__search-kbd">Ctrl K</span>
           </button>
 

@@ -3,7 +3,8 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { Icon } from "@/components/core-icons";
+import { DEMO_USERS, getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
 import { getAssignmentsByOwner, getNotificationsByUser, subscribe } from "@/lib/mock-db";
 
 interface EmployeeShellProps {
@@ -19,7 +20,7 @@ export function EmployeeShell({
   breadcrumbs,
   topbarActions,
 }: EmployeeShellProps) {
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<CoreUser>(DEMO_USERS[0]);
   const [assignmentCount, setAssignmentCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
 
@@ -47,11 +48,11 @@ export function EmployeeShell({
   }, []);
 
   const navItems: NavItem[] = [
-    { label: "Home", href: "/employee/home", icon: "🏠" },
-    { label: "My Work", href: "/employee/my-work", icon: "📋", badge: assignmentCount > 0 ? assignmentCount : undefined },
-    { label: "Requests", href: "/employee/requests", icon: "📨" },
-    { label: "Notifications", href: "/employee/notifications", icon: "🔔", badge: notificationCount > 0 ? notificationCount : undefined },
-    { label: "Profile", href: "/employee/profile", icon: "👤" },
+    { label: "Home", href: "/employee/home", icon: <Icon name="home" /> },
+    { label: "My Work", href: "/employee/my-work", icon: <Icon name="clipboard" />, badge: assignmentCount > 0 ? assignmentCount : undefined },
+    { label: "Requests", href: "/employee/requests", icon: <Icon name="inbox" /> },
+    { label: "Notifications", href: "/employee/notifications", icon: <Icon name="bell" />, badge: notificationCount > 0 ? notificationCount : undefined },
+    { label: "Profile", href: "/employee/profile", icon: <Icon name="user" /> },
   ];
 
   return (
@@ -62,6 +63,9 @@ export function EmployeeShell({
       navSections={[{ label: "Personal", items: navItems }]}
       brand={{
         logoLetter: "C",
+        logoColor: "var(--core-info)",
+        accentColor: "var(--core-info)",
+        accentSoft: "var(--core-info-soft)",
         productName: "CORE",
         roleLabel: "Employee Workspace"
       }}

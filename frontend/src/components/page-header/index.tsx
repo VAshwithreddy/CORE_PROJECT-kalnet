@@ -97,46 +97,48 @@ export function PageHeader({
 
   return (
     <header className="page-header">
-      <div className="page-header__left">
-        {hasBreadcrumbs && (
-          <nav className="page-header__breadcrumbs" aria-label="Breadcrumb">
-            {breadcrumbs!.map((crumb, i) => (
-              <span key={i} style={{ display: "contents" }}>
-                {i > 0 && (
-                  <span aria-hidden="true" style={{ color: "var(--core-border-strong)" }}>
-                    /
-                  </span>
-                )}
-                {crumb.href ? (
-                  <Link href={crumb.href}>{crumb.label}</Link>
-                ) : (
-                  <span aria-current="page">{crumb.label}</span>
-                )}
-              </span>
-            ))}
-          </nav>
-        )}
-
-        <h1 className="page-header__title">{title}</h1>
-
-        {description && (
-          <p className="page-header__description">{description}</p>
-        )}
-
-        {meta && <div className="page-header__meta">{meta}</div>}
-      </div>
-
-      {hasActions && (
-        <div className="page-header__actions" role="group" aria-label="Page actions">
-          {secondaryActions?.map((action, i) => (
-            <ActionButton key={i} action={action} />
-          ))}
-          {primaryAction && (
-            <ActionButton action={primaryAction} isPrimary />
+      <div className="page-header__surface">
+        <div className="page-header__left">
+          {hasBreadcrumbs && (
+            <nav className="page-header__breadcrumbs" aria-label="Breadcrumb">
+              {breadcrumbs!.map((crumb, i) => (
+                <span key={i} style={{ display: "contents" }}>
+                  {i > 0 && (
+                    <span aria-hidden="true" style={{ color: "var(--core-border-strong)" }}>
+                      /
+                    </span>
+                  )}
+                  {crumb.href ? (
+                    <Link href={crumb.href}>{crumb.label}</Link>
+                  ) : (
+                    <span aria-current="page">{crumb.label}</span>
+                  )}
+                </span>
+              ))}
+            </nav>
           )}
-          {actionsSlot}
+
+          <h1 className="page-header__title">{title}</h1>
+
+          {description && (
+            <p className="page-header__description">{description}</p>
+          )}
+
+          {meta && <div className="page-header__meta">{meta}</div>}
         </div>
-      )}
+
+        {hasActions && (
+          <div className="page-header__actions" role="group" aria-label="Page actions">
+            {secondaryActions?.map((action, i) => (
+              <ActionButton key={i} action={action} />
+            ))}
+            {primaryAction && (
+              <ActionButton action={primaryAction} isPrimary />
+            )}
+            {actionsSlot}
+          </div>
+        )}
+      </div>
     </header>
   );
 }
