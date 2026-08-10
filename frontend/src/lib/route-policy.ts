@@ -1,11 +1,11 @@
 import type { UserRole } from "./roles";
 
 export const routeAccess: Record<string, UserRole[]> = {
-  "/employee": ["employee", "department", "executive", "work-admin", "system-admin"],
-  "/department": ["department", "executive", "system-admin"],
-  "/executive": ["executive", "system-admin"],
-  "/work-admin": ["work-admin", "system-admin"],
-  "/system": ["system-admin"],
+  "/employee": ["employee", "department_head", "executive", "work_admin", "system_admin"],
+  "/department": ["department_head", "executive", "system_admin"],
+  "/executive": ["executive", "system_admin"],
+  "/work-admin": ["work_admin", "system_admin"],
+  "/system": ["system_admin"],
 };
 
 export function canAccessRoute(pathname: string, role: UserRole): boolean {

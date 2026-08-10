@@ -11,10 +11,10 @@ export type Permission =
 
 export const rolePermissions: Record<UserRole, Permission[]> = {
   employee: ["assignments:read", "projects:read"],
-  department: ["assignments:read", "assignments:write", "projects:read", "people:read"],
+  department_head: ["assignments:read", "assignments:write", "projects:read", "people:read"],
   executive: ["assignments:read", "projects:read", "people:read"],
-  "work-admin": ["assignments:read", "assignments:write", "projects:read", "projects:write"],
-  "system-admin": [
+  work_admin: ["assignments:read", "assignments:write", "projects:read", "projects:write"],
+  system_admin: [
     "assignments:read",
     "assignments:write",
     "projects:read",

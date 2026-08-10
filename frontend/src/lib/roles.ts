@@ -1,17 +1,17 @@
-export type UserRole = "employee" | "department" | "executive" | "work-admin" | "system-admin";
+export type UserRole = "employee" | "department_head" | "executive" | "work_admin" | "system_admin";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   employee: "Employee",
-  department: "Department Head",
+  department_head: "Department Head",
   executive: "Executive",
-  "work-admin": "Work Admin",
-  "system-admin": "System Admin",
+  work_admin: "Work Admin",
+  system_admin: "System Admin",
 };
 
 export const ROLE_HOME_PATHS: Record<UserRole, string> = {
   employee: "/employee/home",
-  department: "/department/home",
+  department_head: "/department/home",
   executive: "/executive/overview",
-  "work-admin": "/work-admin/home",
-  "system-admin": "/system/users",
+  work_admin: "/work-admin/home",
+  system_admin: "/system/users",
 };

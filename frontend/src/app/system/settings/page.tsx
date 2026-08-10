@@ -46,8 +46,8 @@ export default function SystemSettingsPage() {
               onChange={(e) => setDefaultRole(e.target.value)}
               options={[
                 { value: "employee", label: "Employee" },
-                { value: "department", label: "Department Head" },
-                { value: "work-admin", label: "Work Admin" },
+                { value: "department_head", label: "Department Head" },
+                { value: "work_admin", label: "Work Admin" },
               ]}
             />
           </div>
