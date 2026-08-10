@@ -55,13 +55,13 @@ export function RoleSwitcher() {
                 const currentPath = window.location.pathname;
                 if (user.role === "employee" && !currentPath.startsWith("/employee")) {
                   window.location.href = "/employee/home";
-                } else if (user.role === "department" && !currentPath.startsWith("/department")) {
+                } else if (user.role === "department_head" && !currentPath.startsWith("/department")) {
                   window.location.href = "/department/home";
                 } else if (user.role === "executive" && !currentPath.startsWith("/executive")) {
                   window.location.href = "/executive/overview";
-                } else if (user.role === "work-admin" && !currentPath.startsWith("/work-admin")) {
+                } else if (user.role === "work_admin" && !currentPath.startsWith("/work-admin")) {
                   window.location.href = "/work-admin/home";
-                } else if (user.role === "system-admin" && !currentPath.startsWith("/system")) {
+                } else if (user.role === "system_admin" && !currentPath.startsWith("/system")) {
                   window.location.href = "/system/users";
                 }
               }}
@@ -77,9 +77,9 @@ export function RoleSwitcher() {
                 textAlign: "left",
               }}
             >
-              <div style={{ fontWeight: 500, fontSize: "13px", color: "var(--core-text)" }}>
-                {user.name} <span style={{ fontWeight: 400, color: "var(--core-text-subtle)" }}>({user.role})</span>
-              </div>
+                <div style={{ fontWeight: 500, fontSize: "13px", color: "var(--core-text)" }}>
+                  {user.name} <span style={{ fontWeight: 400, color: "var(--core-text-subtle)" }}>({user.role})</span>
+                </div>
               <div style={{ fontSize: "12px", color: "var(--core-text-muted)", marginTop: 2 }}>
                 {user.roleLabel} • {user.departmentName}
               </div>

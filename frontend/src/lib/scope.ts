@@ -10,6 +10,6 @@ export function buildUserScope(user: AuthUser): UserScope {
   return {
     userId: user.id,
     role: user.role,
-    canViewAllDepartments: user.role === "executive" || user.role === "system-admin",
+    canViewAllDepartments: user.role === "executive" || user.role === "system_admin",
   };
 }

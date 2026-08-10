@@ -40,7 +40,7 @@ export default function DepartmentHeadsPage() {
 
   const deptHeads: DeptHeadRow[] = useMemo(() => {
     return DEMO_USERS
-      .filter((u) => u.role === "department")
+      .filter((u) => u.role === "department_head")
       .map((u) => {
         const teamSize = members.filter((m) => m.departmentId === u.departmentId || !m.departmentId).length;
         return {

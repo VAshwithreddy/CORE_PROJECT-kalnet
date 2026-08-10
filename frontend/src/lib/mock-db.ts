@@ -840,9 +840,9 @@ export function rejectRequest(requestId: string) {
 
 export function getAuditEvents(): AuditEvent[] {
   const defaultEvents: AuditEvent[] = [
-    { id: "AUD-001", timestamp: "Today 09:02", actor: "Priya Kapoor", role: "work-admin", action: "Approved Request", target: "REQ-015 (PTO)", outcome: "approved", outcomeLabel: "Approved" },
+    { id: "AUD-001", timestamp: "Today 09:02", actor: "Priya Kapoor", role: "work_admin", action: "Approved Request", target: "REQ-015 (PTO)", outcome: "approved", outcomeLabel: "Approved" },
     { id: "AUD-002", timestamp: "Today 08:45", actor: "Jane Doe", role: "employee", action: "Submitted Request", target: "REQ-018 (Laptop)", outcome: "new", outcomeLabel: "Logged" },
-    { id: "AUD-003", timestamp: "Yesterday 17:10", actor: "Sarah Wong", role: "department", action: "Created Assignment", target: "A-1040 (Cloud Infra)", outcome: "in-progress", outcomeLabel: "Created" },
+    { id: "AUD-003", timestamp: "Yesterday 17:10", actor: "Sarah Wong", role: "department_head", action: "Created Assignment", target: "A-1040 (Cloud Infra)", outcome: "in-progress", outcomeLabel: "Created" },
   ];
   return loadFromStorage("audit_events", defaultEvents);
 }
