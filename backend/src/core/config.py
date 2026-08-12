@@ -1,4 +1,3 @@
-
 import os
 from dataclasses import dataclass
 
@@ -6,9 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()  # loads values from .env into os.getenv()
 
+
 def _csv_env(name: str, default: str) -> list[str]:
     value = os.getenv(name, default)
     return [item.strip() for item in value.split(",") if item.strip()]
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -22,9 +23,21 @@ class Settings:
     jwt_algorithms: list[str]
     jwks_url: str
 
+    # Notification AI Intelligence
+    ai_enabled: bool
+    ai_api_key: str
+    ai_model: str
+
+    # Notification rules
+    notification_deadline_warning_hours: int
+    notification_escalation_hours_default: int
+    notification_escalation_hours_high_priority: int
+
+
 def load_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL", "")
     jwks_url = os.getenv("JWKS_URL", "")
+
     if not jwks_url:
         # Extract from database_url if it's a Supabase pooler/direct connection
         # e.g., postgresql://postgres.jgpklwlzxvlisiktgkzu:...
@@ -37,13 +50,55 @@ def load_settings() -> Settings:
     return Settings(
         project_name=os.getenv("CORE_PROJECT_NAME", "CORE API"),
         environment=os.getenv("CORE_ENV", "development"),
-        allowed_origins=_csv_env("CORE_ALLOWED_ORIGINS", "http://localhost:3000"),
+        allowed_origins=_csv_env(
+            "CORE_ALLOWED_ORIGINS",
+            "http://localhost:3000",
+        ),
         database_url=database_url,
-        secret_key=os.getenv("SECRET_KEY", "insecure-default-secret-key"),
-        access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
-        refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
-        jwt_algorithms=_csv_env("JWT_ALGORITHMS", "HS256,ES256,RS256"),
+        secret_key=os.getenv(
+            "SECRET_KEY",
+            "insecure-default-secret-key",
+        ),
+        access_token_expire_minutes=int(
+            os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+        ),
+        refresh_token_expire_days=int(
+            os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")
+        ),
+        jwt_algorithms=_csv_env(
+            "JWT_ALGORITHMS",
+            "HS256,ES256,RS256",
+        ),
         jwks_url=jwks_url,
+
+        # Notification AI Intelligence
+        ai_enabled=os.getenv("AI_ENABLED", "false").lower() == "true",
+        ai_api_key=os.getenv("AI_API_KEY", ""),
+        ai_model=os.getenv(
+            "AI_MODEL",
+            "claude-3-5-sonnet-20241022",
+        ),
+
+        # Notification rules
+        notification_deadline_warning_hours=int(
+            os.getenv(
+                "NOTIFICATION_DEADLINE_WARNING_HOURS",
+                "48",
+            )
+        ),
+        notification_escalation_hours_default=int(
+            os.getenv(
+                "NOTIFICATION_ESCALATION_HOURS_DEFAULT",
+                "96",
+            )
+        ),
+        notification_escalation_hours_high_priority=int(
+            os.getenv(
+                "NOTIFICATION_ESCALATION_HOURS_HIGH_PRIORITY",
+                "24",
+            )
+        ),
     )
+
 
 settings = load_settings()

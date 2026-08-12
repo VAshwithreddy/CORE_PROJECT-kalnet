@@ -14,6 +14,7 @@ from src.models.weekly_digest import WeeklyDigest
 from src.models.staleness_alert import StalenessAlert
 from src.models.approval_request import ApprovalRequest
 from src.models.notification import Notification
+from src.models.notification_enrichment import NotificationEnrichment
 from src.models.audit_log import AuditLog
 from src.models.service_account import ServiceAccount
 
@@ -27,6 +28,7 @@ __all__ = [
     "StalenessAlert",
     "ApprovalRequest",
     "Notification",
+    "NotificationEnrichment",
     "AuditLog",
     "ServiceAccount",
 ]
