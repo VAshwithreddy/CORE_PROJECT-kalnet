@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
+from uuid import UUID
 from sqlalchemy.orm import Session
 from src.core.database import get_db, get_rls_db_for
 from src.core.dependencies import get_current_user, CurrentUser, require_roles
@@ -33,7 +34,7 @@ def get_stale_alerts(
     dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
 def get_alert_by_id(
-    id: str, 
+    id: UUID, 
     db: Session = Depends(get_rls_db_for(get_current_user))
 ) -> AlertResponse:
     """
@@ -49,7 +50,7 @@ def get_alert_by_id(
     dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
 def update_alert(
-    id: str, 
+    id: UUID, 
     update_data: AlertUpdate, 
     db: Session = Depends(get_rls_db_for(get_current_user))
 ) -> AlertResponse:

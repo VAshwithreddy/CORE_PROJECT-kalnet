@@ -1,0 +1,38 @@
+# Optional alternative to a cron job or systemd timer on a dedicated host
+# — see backend/scripts/run_notification_sweep.py for what this runs and
+# why. Requires DATABASE_URL, SECRET_KEY, and (if AI enrichment is turned
+# on) AI_API_KEY to be set as repository secrets; none are hardcoded here.
+#
+# This workflow is provided but not required — pick whichever scheduling
+# mechanism matches how the rest of CORE is already operated (see
+# backend/scripts/run_notification_sweep.py's docstring for the other
+# options: cron, systemd timer).
+name: CORE notification sweep
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run notification sweep
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          AI_ENABLED: ${{ vars.AI_ENABLED || 'false' }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: python scripts/run_notification_sweep.py --enrich --quiet
