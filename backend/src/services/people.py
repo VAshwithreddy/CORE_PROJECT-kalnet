@@ -34,6 +34,7 @@ class PeopleService:
                     full_name=person.full_name or "",
                     job_title=person.job_title or "",
                     department_name=dept_name,
+                    department_id=person.department_id,
                     role=person.role.value if hasattr(person.role, 'value') else person.role,
                     availability=person.availability.value if hasattr(person.availability, 'value') else person.availability,
                 )

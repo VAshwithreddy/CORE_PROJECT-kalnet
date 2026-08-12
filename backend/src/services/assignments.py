@@ -52,6 +52,7 @@ class AssignmentsService:
             end_date=assignment.end_date,
             created_at=assignment.created_at or datetime.now(),
             updated_at=assignment.updated_at or datetime.now(),
+            department_id=person.department_id if person else None,
         )
 
     @staticmethod

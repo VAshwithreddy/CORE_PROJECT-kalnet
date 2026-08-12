@@ -29,12 +29,33 @@ async function apiRequest(path: string, token?: string, options?: { method?: str
   return res.json();
 }
 
-export function getAssignments(token?: string) {
-  return apiRequest("/assignments", token);
+export async function getAssignments(token?: string) {
+  const res = await apiRequest("/assignments", token);
+  return Array.isArray(res)
+    ? res.map((a: any) => ({
+        ...a,
+        title: a.role || "Developer",
+        project: a.project_name || "Unknown Project",
+        projectId: a.project_id || "",
+        owner: a.person_name || "Unassigned",
+        ownerId: a.person_id || "",
+        departmentId: a.department_id || "",
+        dueDate: a.end_date || "2026-12-31",
+        progress: a.status === "completed" || a.status === "done" ? 100 : 50,
+        priority: "Medium",
+      }))
+    : [];
 }
 
-export function getPeople(token?: string) {
-  return apiRequest("/people", token);
+export async function getPeople(token?: string) {
+  const res = await apiRequest("/people", token);
+  return Array.isArray(res)
+    ? res.map((p: any) => ({
+        ...p,
+        name: p.full_name || p.name,
+        departmentId: p.department_id || p.departmentId,
+      }))
+    : [];
 }
 
 export function getEmployeeDashboard(token?: string) {
@@ -69,8 +90,9 @@ export function getRequests(token?: string) {
   return apiRequest("/requests", token);
 }
 
-export function getBlockers(token?: string) {
-  return apiRequest("/blockers", token);
+export async function getBlockers(token?: string) {
+  const assignments = await getAssignments(token);
+  return assignments.filter((a: any) => a.status === "blocked");
 }
 
 export function getNotifications(token?: string) {
