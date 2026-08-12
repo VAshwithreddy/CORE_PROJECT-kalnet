@@ -7,15 +7,31 @@ import { DetailDrawer, DrawerField, DrawerSection } from "@/components/detail-dr
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
-import {
-  getTeamMembers,
-  getAssignments,
-  getBlockers,
-  updateTeamMemberLoad,
-  subscribe,
-  type TeamMember,
-  type LoadBand,
-} from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
+import { getPeople, getAssignments, getBlockers } from "@/lib/api";
+
+export type LoadBand = "healthy" | "full" | "overloaded";
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  role: string;
+  roleLabel: string;
+  departmentId: string;
+  departmentName: string;
+  status: "approved" | "blocked" | "waiting" | "neutral" | "info" | "danger" | "warning";
+  statusLabel: string;
+  currentLoad: number;
+  loadBand: LoadBand;
+  availability: string;
+  manager: string;
+  location: string;
+  skills: string[];
+  workloadSummary: string;
+  nextDelivery: string;
+  activeAssignments: number;
+  blockers: number;
+};
 
 /* ── Load helpers ───────────────────────────────────────────────────────────── */
 
@@ -31,6 +47,17 @@ const loadStatus: Record<LoadBand, BadgeStatus> = {
   overloaded: "blocked",
 };
 
+function teamStatusToBadge(status: TeamMember["status"]): BadgeStatus {
+  switch (status) {
+    case "approved": return "approved";
+    case "blocked": return "blocked";
+    case "waiting": return "waiting";
+    case "danger": return "blocked";
+    case "warning": return "waiting";
+    default: return "in-progress";
+  }
+}
+
 /* ── Columns ────────────────────────────────────────────────────────────────── */
 
 const columns: DataTableColumn<TeamMember>[] = [
@@ -38,12 +65,11 @@ const columns: DataTableColumn<TeamMember>[] = [
     key: "name",
     header: "Name",
     sortable: true,
-    minWidth: "220px",
+    minWidth: "180px",
     render: (row) => (
       <div>
         <strong>{row.name}</strong>
         <div style={{ color: "var(--core-text-subtle)", fontSize: "var(--core-text-xs)", marginTop: 3 }}>
-          {row.id}
         </div>
       </div>
     ),
@@ -79,13 +105,14 @@ const columns: DataTableColumn<TeamMember>[] = [
     key: "status",
     header: "Status",
     sortable: true,
-    render: (row) => <StatusBadge status={row.status} size="sm" label={row.statusLabel} />,
+    render: (row) => <StatusBadge status={teamStatusToBadge(row.status)} size="sm" label={row.statusLabel} />,
   },
 ];
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function TeamPage() {
+  const { user, token } = useAuth();
   /* ── Live state ───────────────────────────────────────────────────────────── */
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -99,31 +126,43 @@ export default function TeamPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [notice, setNotice] = useState("2 team members need capacity review before new work is assigned.");
 
-  /* ── Sync from mock-db ────────────────────────────────────────────────────── */
-  const sync = useCallback(() => {
-    const members = getTeamMembers();
-    const allAssignments = getAssignments();
-    const allBlockers = getBlockers();
+  /* ── Sync from backend ────────────────────────────────────────────────────── */
+  const sync = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [membersData, assignmentsData, blockersData] = await Promise.all([
+        getPeople(token).catch(() => []),
+        getAssignments(token).catch(() => []),
+        getBlockers(token).catch(() => []),
+      ]);
+      
+      const members = Array.isArray(membersData) ? membersData : [];
+      const allAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
+      const allBlockers = Array.isArray(blockersData) ? blockersData : [];
 
-    // Re-derive counts from live data
-    const enriched = members.map((m) => {
-      const myAssignments = allAssignments.filter((a) => a.owner === m.name);
-      const myBlockers = allBlockers.filter((b) => b.owner === m.name);
-      return {
-        ...m,
-        activeAssignments: myAssignments.filter(
-          (a) => a.status !== "completed" && a.status !== "archived",
-        ).length,
-        blockers: myBlockers.length,
-      };
-    });
-
-    setTeamMembers(enriched);
-  }, []);
+      const enriched = members.map((m: any) => {
+        const myAssignments = allAssignments.filter((a: any) => a.owner === m.name);
+        const myBlockers = allBlockers.filter((b: any) => b.owner === m.name);
+        return {
+          ...m,
+          activeAssignments: myAssignments.filter(
+            (a: any) => a.status !== "completed" && a.status !== "archived",
+          ).length,
+          blockers: myBlockers.length,
+          // Ensure fallbacks for UI rendering if API fields are missing
+          skills: m.skills || [],
+          loadBand: m.loadBand || "healthy",
+          currentLoad: m.currentLoad || 0,
+        };
+      });
+      setTeamMembers(enriched);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [token]);
 
   useEffect(() => {
     sync();
-    return subscribe(sync);
   }, [sync]);
 
   // Keep drawer in sync if the selected member's data changes
@@ -168,9 +207,9 @@ export default function TeamPage() {
   /* ── Drawer actions ───────────────────────────────────────────────────────── */
 
   const handleAdjustLoad = (memberId: string, delta: number) => {
-    updateTeamMemberLoad(memberId, delta);
-    sync();
-    setNotice(`Load adjusted by ${delta > 0 ? "+" : ""}${delta}% for team member.`);
+    // updateTeamMemberLoad(memberId, delta);
+    // sync();
+    setNotice(`Backend load adjustment not implemented yet.`);
   };
 
   return (

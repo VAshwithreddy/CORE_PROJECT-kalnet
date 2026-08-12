@@ -5,14 +5,8 @@ import { DepartmentShell } from "@/components/department-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { StatusBadge } from "@/components/status-badge";
-import {
-  getAssignmentsByDepartment,
-  getBlockersByDepartment,
-  getProjectsByDepartment,
-  getTeamMembersByDepartment,
-  subscribe,
-} from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getAssignments, getProjects, getPeople } from "@/lib/api";
 
 interface DigestItem {
   id: string;
@@ -28,29 +22,36 @@ interface DigestSection {
 }
 
 export default function DigestPage() {
+  const { user, token } = useAuth();
   const [week] = useState("Week of Oct 16");
   const [notice, setNotice] = useState("");
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [team, setTeam] = useState<any[]>([]);
 
-  /* ── Sync from mock-db ────────────────────────────────────────────────────── */
-  const [, setTick] = useState(0);
-  const sync = useCallback(() => setTick((t) => t + 1), []);
+  const sync = useCallback(async () => {
+    if (!token || !user) return;
+    const deptId = user.departmentId;
+    try {
+      const [aData, pData, tData] = await Promise.all([
+        getAssignments(token).catch(() => []),
+        getProjects(token).catch(() => []),
+        getPeople(token).catch(() => []),
+      ]);
+      setAssignments((Array.isArray(aData) ? aData : []).filter((a: any) => a.departmentId === deptId));
+      setProjects((Array.isArray(pData) ? pData : []).filter((p: any) => p.departmentId === deptId));
+      setTeam((Array.isArray(tData) ? tData : []).filter((m: any) => !m.departmentId || m.departmentId === deptId));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [token, user]);
 
   useEffect(() => {
     sync();
-    const unsubSession = subscribeSession(() => sync());
-    const unsubDb = subscribe(sync);
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
   }, [sync]);
 
-  /* ── Derive live digest sections ──────────────────────────────────────────── */
-  const deptId = getCurrentUser().departmentId;
-  const assignments = getAssignmentsByDepartment(deptId);
-  const blockers = getBlockersByDepartment(deptId);
-  const projects = getProjectsByDepartment(deptId);
-  const team = getTeamMembersByDepartment(deptId);
+  // Blockers not yet available from backend — empty array until endpoint is added
+  const blockers: any[] = [];
 
   const metrics = useMemo(() => {
     const completedCount = assignments.filter(
@@ -96,43 +97,39 @@ export default function DigestPage() {
   }, [assignments, blockers, projects]);
 
   const sections: DigestSection[] = useMemo(() => {
-    // Accomplishments: completed/approved assignments
     const accomplishments: DigestItem[] = assignments
-      .filter((a) => a.status === "completed" || a.status === "approved")
-      .map((a) => ({
+      .filter((a: any) => a.status === "completed" || a.status === "approved")
+      .map((a: any) => ({
         id: a.id,
         text: a.title,
-        owner: a.owner,
+        owner: a.owner || a.person_name || "",
         status: "success" as const,
       }));
 
-    // Risks & Blockers: active blocker items
-    const risks: DigestItem[] = blockers.map((b) => ({
+    const risks: DigestItem[] = blockers.map((b: any) => ({
       id: b.id,
-      text: `${b.title} — ${b.reason}`,
-      owner: b.owner,
+      text: `${b.title} — ${b.reason || ""}`,
+      owner: b.owner || "",
       tag: b.severity === "High" ? "High Risk" : "Blocked",
       status: b.severity === "High" ? ("danger" as const) : ("warning" as const),
     }));
 
-    // Capacity concerns: overloaded team members
     const capacityConcerns: DigestItem[] = team
-      .filter((m) => m.loadBand === "overloaded")
-      .map((m) => ({
+      .filter((m: any) => m.loadBand === "overloaded")
+      .map((m: any) => ({
         id: m.id,
-        text: `${m.name} is at ${m.currentLoad}% capacity — ${m.workloadSummary}`,
-        owner: m.manager,
+        text: `${m.name} is at ${m.currentLoad ?? 0}% capacity`,
+        owner: m.manager || "",
         tag: "Over Capacity",
         status: "danger" as const,
       }));
 
-    // Project milestones: active projects with upcoming milestones
     const milestones: DigestItem[] = projects
-      .filter((p) => p.status === "in-progress" || p.status === "waiting")
-      .map((p) => ({
+      .filter((p: any) => p.status === "in-progress" || p.status === "waiting")
+      .map((p: any) => ({
         id: p.id,
-        text: `${p.name} — next milestone: ${p.nextMilestone} (${p.progress}% complete)`,
-        owner: p.owner,
+        text: `${p.name} — next milestone: ${p.nextMilestone || "TBD"} (${p.progress ?? 0}% complete)`,
+        owner: p.owner || "",
         tag: p.health,
         status:
           p.health === "Off Track"
@@ -191,7 +188,7 @@ export default function DigestPage() {
       >
         <h2 style={{ fontSize: "var(--core-text-xl)", margin: 0 }}>{week}</h2>
         <span style={{ color: "var(--core-text-muted)" }}>
-          Last updated: Now (live from mock-db)
+          Last updated: Live from Supabase
         </span>
       </div>
 

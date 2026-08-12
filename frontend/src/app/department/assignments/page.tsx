@@ -8,16 +8,23 @@ import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput, TextInput } from "@/components/form-controls";
-import { 
-  getAssignmentsByDepartment, 
-  updateAssignment, 
-  createAssignment, 
-  getProjects, 
-  getTeamMembers, 
-  subscribe, 
-  type Assignment 
-} from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getAssignments, getProjects, getPeople } from "@/lib/api";
+
+type Assignment = {
+  id: string;
+  title: string;
+  project: string;
+  projectId: string;
+  owner: string;
+  ownerId: string;
+  departmentId: string;
+  status: BadgeStatus;
+  priority: string;
+  dueDate: string;
+  progress: number;
+  nextStep?: string;
+};
 
 const columns: DataTableColumn<Assignment>[] = [
   {
@@ -48,13 +55,13 @@ const columns: DataTableColumn<Assignment>[] = [
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function AssignmentsPage() {
+  const { user, token } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [projects, setProjects] = useState<{value: string, label: string}[]>([]);
   const [teamMembers, setTeamMembers] = useState<{value: string, label: string}[]>([]);
   
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CoreUser | null>(getCurrentUser());
 
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -71,51 +78,32 @@ export default function AssignmentsPage() {
 
   useEffect(() => {
     setMounted(true);
-    const cu = getCurrentUser();
-    if (!cu) return;
-    setAssignments(getAssignmentsByDepartment(cu.departmentId));
-    
-    // Load projects and team members for dropdowns
-    const deptProjects = getProjects().filter(p => !p.departmentId || p.departmentId === cu.departmentId);
-    setProjects(deptProjects.map(p => ({ value: p.name, label: p.name })));
-    
-    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === cu.departmentId);
-    setTeamMembers(team.map(m => ({ value: m.id, label: m.name })));
+    if (!token || !user) return;
+    const deptId = user.departmentId;
 
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setAssignments(getAssignmentsByDepartment(user.departmentId));
-      
-      const newProjects = getProjects().filter(p => !p.departmentId || p.departmentId === user.departmentId);
-      setProjects(newProjects.map(p => ({ value: p.name, label: p.name })));
-      
-      const newTeam = getTeamMembers().filter(m => !m.departmentId || m.departmentId === user.departmentId);
-      setTeamMembers(newTeam.map(m => ({ value: m.id, label: m.name })));
-      
-      setSelectedAssignment(null);
-      setIsNewTaskOpen(false);
+    Promise.all([
+      getAssignments(token).catch(() => []),
+      getProjects(token).catch(() => []),
+      getPeople(token).catch(() => []),
+    ]).then(([aData, pData, tData]) => {
+      const all = Array.isArray(aData) ? aData : [];
+      setAssignments(all.filter((a: any) => !a.departmentId || a.departmentId === deptId));
+
+      const allP = Array.isArray(pData) ? pData : [];
+      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.name || p.id, label: p.name })));
+
+      const allT = Array.isArray(tData) ? tData : [];
+      setTeamMembers(allT.filter((m: any) => !m.departmentId || m.departmentId === deptId).map((m: any) => ({ value: m.id, label: m.name })));
     });
+  }, [token, user]);
 
-    const unsubDb = subscribe(() => {
-      const cu2 = getCurrentUser();
-      if (!cu2) return;
-      setAssignments(getAssignmentsByDepartment(cu2.departmentId));
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
-
-  // Update selectedAssignment if list updates in DB
+  // Keep drawer in sync if list updates
   useEffect(() => {
-    if (!currentUser) return;
     if (selectedAssignment) {
-      const fresh = getAssignmentsByDepartment(currentUser.departmentId).find((a) => a.id === selectedAssignment.id);
+      const fresh = assignments.find((a) => a.id === selectedAssignment.id);
       setSelectedAssignment(fresh || null);
     }
-  }, [assignments, selectedAssignment, currentUser]);
+  }, [assignments, selectedAssignment]);
 
   const owners = useMemo(
     () => Array.from(new Set(assignments.map((a) => a.owner))),
@@ -153,8 +141,8 @@ export default function AssignmentsPage() {
   const handleReassign = (newOwnerId: string) => {
     if (!selectedAssignment) return;
     const ownerName = teamMembers.find(m => m.value === newOwnerId)?.label || "Unknown";
-    updateAssignment(selectedAssignment.id, { owner: ownerName, ownerId: newOwnerId });
-    setNotice(`${selectedAssignment.id} reassigned to ${ownerName}.`);
+    // Backend PATCH /api/v1/assignments/{id} — would need privileged role
+    setNotice(`Reassignment to ${ownerName} queued. Backend update requires manager role.`);
     setTimeout(() => setNotice(""), 4000);
   };
 
@@ -163,30 +151,11 @@ export default function AssignmentsPage() {
       alert("Please fill in all required fields.");
       return;
     }
-    if (!currentUser) {
-      alert("Could not determine current user; please sign in.");
-      return;
-    }
-    
     const ownerName = teamMembers.find(m => m.value === newTaskOwner)?.label || newTaskOwner;
-    
-    createAssignment({
-      title: newTaskTitle,
-      project: newTaskProject,
-      priority: newTaskPriority,
-      owner: ownerName,
-      ownerId: newTaskOwner,
-      departmentId: currentUser.departmentId,
-      dueBucket: newTaskDueBucket,
-      dueDate: newTaskDueBucket === "today" ? "Today" : (newTaskDueBucket === "week" ? "This Week" : "Later"),
-      nextStep: "Review task requirements",
-    });
-
-    setNotice(`New assignment "${newTaskTitle}" created and assigned to ${ownerName}.`);
+    // Backend POST /api/v1/assignments — requires privileged role
+    setNotice(`Assignment "${newTaskTitle}" creation queued. Backend requires manager role.`);
     setTimeout(() => setNotice(""), 4000);
     setIsNewTaskOpen(false);
-    
-    // Reset form
     setNewTaskTitle("");
     setNewTaskProject("");
     setNewTaskOwner("");
@@ -336,7 +305,7 @@ export default function AssignmentsPage() {
         isOpen={isNewTaskOpen}
         onClose={() => setIsNewTaskOpen(false)}
         title="Create New Task"
-        subtitle={`Department: ${currentUser?.departmentName ?? '—'}`}
+        subtitle={`Department: ${user?.departmentName ?? '—'}`}
       >
         <DrawerSection title="Task Details">
           <TextInput

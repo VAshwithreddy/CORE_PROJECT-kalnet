@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DEMO_USERS, loginWithCredentials, getCurrentUser } from "@/lib/mock-session";
+import { signInWithPopup, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword } from "firebase/auth";
+import { auth as firebaseAuth } from "@/lib/firebase";
 import { ROLE_HOME_PATHS } from "@/lib/roles";
+import { useAuth, type AuthUser } from "@/lib/auth";
 
 const INFO_ITEMS = [
   {
@@ -75,22 +77,58 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user, loading: authLoading, error: authError, logout } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showDemoUsers, setShowDemoUsers] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-
+  const isExecutingOAuthRef = useRef(false);
+  
   useEffect(() => {
     setMounted(true);
-    const user = getCurrentUser();
-    if (user && typeof window !== "undefined" && document.cookie.includes("core_session_role")) {
-      const target = redirectPath || ROLE_HOME_PATHS[user.role];
+
+    const isLogout = searchParams.get("logout") === "true";
+    if (isLogout) {
+      logout();
+      return;
+    }
+  }, [searchParams, logout]);
+
+  // Handle successful login redirect
+  useEffect(() => {
+    if (user && !authLoading) {
+      const target = redirectPath || ROLE_HOME_PATHS[user.role as keyof typeof ROLE_HOME_PATHS] || "/employee/home";
       router.push(target);
     }
-  }, [redirectPath, router]);
+  }, [user, authLoading, router, redirectPath]);
+
+  // Sync auth context error with local error
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+      setLoading(false);
+    }
+  }, [authError]);
 
   if (!mounted) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchSupabaseUserByEmail = async (userEmail: string): Promise<any | null> => {
+    const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/lookup?email=${encodeURIComponent(userEmail.trim().toLowerCase())}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data as AuthUser;
+      }
+    } catch (err) {
+      console.warn("Backend email lookup failed:", err);
+    }
+    return null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!email || !password) {
@@ -98,16 +136,59 @@ function LoginForm() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const result = loginWithCredentials(email, password);
-      if (!result.success || !result.user) {
-        setError(result.error || "Authentication failed.");
-        setLoading(false);
-      } else {
-        const target = redirectPath || ROLE_HOME_PATHS[result.user.role];
-        router.push(target);
+
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("active_login_attempt", "true");
       }
-    }, 600);
+      await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
+      // Wait for useAuth effect / onAuthStateChanged to handle redirect and profile loading
+    } catch (err: any) {
+      console.error(err);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("active_login_attempt");
+      }
+      let errMsg = err?.message || "Authentication failed.";
+      if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+        errMsg = "Invalid email or password.";
+      }
+      setError(errMsg);
+      setLoading(false);
+    }
+  };
+
+
+  const handleGoogleSignInClick = async () => {
+    if (isExecutingOAuthRef.current || loading || authLoading) return;
+    isExecutingOAuthRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("active_login_attempt", "true");
+      }
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(firebaseAuth, provider);
+      // useAuth effect will handle lookup and redirect
+    } catch (err: any) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("active_login_attempt");
+      }
+      if (err.code === "auth/popup-blocked" || err.code === "auth/cancelled-popup-request") {
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(firebaseAuth, provider);
+          return;
+        } catch (redirectErr: any) {
+          setError(redirectErr?.message || "Redirect authentication failed.");
+        }
+      } else {
+        setError(err?.message || "Authentication failed.");
+      }
+      setLoading(false);
+      isExecutingOAuthRef.current = false;
+    }
   };
 
   const fillCredentials = (demoEmail: string, demoPass: string) => {
@@ -347,7 +428,7 @@ function LoginForm() {
                   background: loading ? "#94a3b8" : "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
                 }}
               >
-                {loading ? "Logging in…" : "Login →"}
+                {loading || authLoading ? "Logging in…" : "Login →"}
               </button>
             </form>
 
@@ -362,8 +443,9 @@ function LoginForm() {
             <button
               id="login-google"
               type="button"
+              disabled={loading}
               className="google-btn"
-              onClick={() => setError("Google SSO is not configured in this environment. Use the demo credentials below.")}
+              onClick={handleGoogleSignInClick}
               style={{
                 width: "100%", height: 48, borderRadius: 10,
                 border: "1.5px solid #e2e8f0", background: "#fff",
@@ -399,56 +481,7 @@ function LoginForm() {
             </div>
           </div>
 
-          {/* Demo Credentials – below card */}
-          <div style={{ marginTop: 20 }}>
-            <button
-              type="button"
-              onClick={() => setShowDemoUsers(!showDemoUsers)}
-              style={{
-                width: "100%", background: "transparent", border: "1.5px dashed #cbd5e1",
-                borderRadius: 10, padding: "10px 16px", cursor: "pointer",
-                fontSize: 13, color: "#64748b", fontWeight: 600,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0d9488"; e.currentTarget.style.color = "#0d9488"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.color = "#64748b"; }}
-            >
-              <span>🧪</span>
-              {showDemoUsers ? "Hide Demo Accounts" : "Try a Demo Account"}
-            </button>
-
-            {showDemoUsers && (
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
-                {DEMO_USERS.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    className="demo-row-btn"
-                    onClick={() => fillCredentials(user.email, user.password || "")}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 14px",
-                      background: "#fff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      fontSize: 13, textAlign: "left",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0d9488"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(13,148,136,0.12)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
-                  >
-                    <div>
-                      <span style={{ fontWeight: 700, color: "#0f172a" }}>{user.name}</span>
-                      <span style={{ color: "#94a3b8", marginLeft: 6, fontSize: 12 }}>({user.roleLabel})</span>
-                    </div>
-                    <span style={{ color: "#0d9488", fontWeight: 700, fontSize: 12 }}>Auto-fill →</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Demo Users removed */}
         </div>
       </div>
 

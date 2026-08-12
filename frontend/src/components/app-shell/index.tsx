@@ -3,9 +3,11 @@
 import { useState, useEffect, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { DEMO_USERS, getCurrentUser, subscribeSession, logoutUser, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
 import { canAccessRoute } from "@/lib/route-policy";
 import { Icon } from "@/components/core-icons";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 
 export interface NavItem {
   label: string;
@@ -65,21 +67,21 @@ export function AppShell({
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(DEMO_USERS[0]);
+  const { user: authUser, logout } = useAuth();
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    setCurrentUser(getCurrentUser());
+    if (authUser) {
+      setCurrentUser(authUser);
+    }
     setSessionReady(true);
-    return subscribeSession((newUser) => {
-      if (newUser) setCurrentUser(newUser);
-    });
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
-    if (!sessionReady) return;
+    if (!sessionReady || !currentUser) return;
     if (pathname && !pathname.startsWith("/forbidden") && !pathname.startsWith("/login") && pathname !== "/") {
       if (!canAccessRoute(pathname, currentUser.role)) {
         router.replace("/forbidden");
@@ -87,8 +89,12 @@ export function AppShell({
     }
   }, [pathname, currentUser, router, sessionReady]);
 
-  const handleLogout = () => {
-    logoutUser();
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      console.error("Logout error", e);
+    }
     router.replace("/login");
   };
 

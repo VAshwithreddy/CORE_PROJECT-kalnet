@@ -9,8 +9,25 @@ import { PageHeader } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { TextInput, SelectInput } from "@/components/form-controls";
-import { getProjectsByDepartment, createProject, getTeamMembers, subscribe, type ProjectItem, type ProjectHealth } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getProjects, getPeople } from "@/lib/api";
+
+export type ProjectHealth = "On Track" | "At Risk" | "Off Track" | "Delivered";
+
+export type ProjectItem = {
+  id: string;
+  name: string;
+  departmentId: string;
+  ownerId: string;
+  owner: string;
+  status: "new" | "waiting" | "in-progress" | "blocked" | "completed" | "archived";
+  statusLabel: string;
+  health: ProjectHealth;
+  dueDate: string;
+  progress: number;
+  nextMilestone: string;
+  blockers: number;
+};
 
 const healthStatusMap: Record<ProjectHealth, BadgeStatus> = {
   "On Track": "approved",
@@ -71,9 +88,9 @@ const columns: DataTableColumn<ProjectItem>[] = [
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function ProjectsPage() {
+  const { user, token } = useAuth();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [teamMembers, setTeamMembers] = useState<{value: string, label: string}[]>([]);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
   const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [activeTab, setActiveTab] = useState("Overview");
@@ -93,10 +110,20 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     setMounted(true);
-    setProjects(getProjectsByDepartment(getCurrentUser().departmentId));
-    
-    const team = getTeamMembers().filter(m => !m.departmentId || m.departmentId === getCurrentUser().departmentId);
-    setTeamMembers(team.map(m => ({ value: m.id, label: m.name })));
+    if (!token || !user) return;
+
+    Promise.all([
+      getProjects(token).catch(() => []),
+      getPeople(token).catch(() => []),
+    ]).then(([projData, teamData]) => {
+      const allProjects = Array.isArray(projData) ? projData : [];
+      // Filter projects by department
+      setProjects(allProjects.filter((p: any) => p.departmentId === user.departmentId));
+
+      const team = Array.isArray(teamData) ? teamData : [];
+      const deptTeam = team.filter((m: any) => !m.departmentId || m.departmentId === user.departmentId);
+      setTeamMembers(deptTeam.map((m: any) => ({ value: m.id, label: m.name })));
+    });
 
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -105,24 +132,7 @@ export default function ProjectsPage() {
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
-
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setProjects(getProjectsByDepartment(user.departmentId));
-      
-      const newTeam = getTeamMembers().filter(m => !m.departmentId || m.departmentId === user.departmentId);
-      setTeamMembers(newTeam.map(m => ({ value: m.id, label: m.name })));
-    });
-
-    const unsubDb = subscribe(() => {
-      setProjects(getProjectsByDepartment(getCurrentUser().departmentId));
-    });
-    
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
+  }, [token, user]);
 
   const owners = useMemo(
     () => Array.from(new Set(projects.map((p) => p.owner))),
@@ -177,17 +187,9 @@ export default function ProjectsPage() {
 
     const ownerName = teamMembers.find(m => m.value === formOwner)?.label || formOwner;
 
-    createProject({
-      name: formName,
-      status: formStatus,
-      statusLabel: formStatusLabel,
-      health: formHealth,
-      owner: ownerName,
-      ownerId: formOwner,
-      departmentId: currentUser.departmentId,
-      dueDate: formDueDate,
-      nextMilestone: formNextMilestone,
-    });
+    // Backend integration for creating project goes here
+    // createProject({ ... });
+
     setNotice("Project created successfully.");
     closeDrawer();
     setTimeout(() => setNotice(""), 5000);

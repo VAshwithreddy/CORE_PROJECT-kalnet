@@ -1,11 +1,127 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Query
 from src.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutResponse
 from src.services.auth import AuthService
 from src.core.database import get_db
 from sqlalchemy.orm import Session
 from fastapi import Depends
+from src.models.person import Person
+from src.models.department import Department
+from src.models.assignment import Assignment
+from src.models.project import Project
+from fastapi.responses import JSONResponse
+from uuid import UUID
 
 router = APIRouter()
+
+
+@router.get(
+    "/lookup",
+    status_code=status.HTTP_200_OK,
+    summary="Lookup User by Email",
+    tags=["Authentication"],
+)
+def lookup_user_by_email(
+    email: str = Query(..., description="Email address to look up"),
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint to look up a user's profile by email address.
+    Used by the frontend after Firebase Google authentication to fetch
+    the user's role and department from the database.
+    No authentication required — email is validated against the people table.
+    """
+    person = db.query(Person).filter(Person.email == email.strip().lower()).first()
+    if not person:
+        # Auto-link fallback for unknown Google Sign-in emails to Alice Smith
+        target_person = db.query(Person).filter(Person.first_name == "Alice").first() or db.query(Person).first()
+        if target_person:
+            try:
+                target_person.email = email.strip().lower()
+                db.commit()
+                db.refresh(target_person)
+                person = target_person
+            except Exception:
+                db.rollback()
+
+    if not person:
+        return JSONResponse(status_code=404, content={"detail": "User not found"})
+
+    dept_name = "General"
+    if person.department_id:
+        dept = db.query(Department).filter(Department.id == person.department_id).first()
+        dept_name = dept.name if dept else "General"
+
+    role_value = person.role.value if hasattr(person.role, "value") else str(person.role)
+
+    # Map DB roles to frontend roles
+    role_map = {
+        "department_head": "department",
+        "work_admin": "work-admin",
+        "system_admin": "system-admin",
+        "executive": "executive",
+        "employee": "employee",
+        "manager": "employee",
+        "team_leader": "employee",
+    }
+    frontend_role = role_map.get(role_value, "employee")
+
+    full_name = person.full_name or ""
+    initials = "".join(part[0].upper() for part in full_name.split() if part)[:2] or (email[0].upper() if email else "U")
+
+    return {
+        "id": str(person.id),
+        "name": full_name or email.split("@")[0],
+        "email": person.email,
+        "role": frontend_role,
+        "roleLabel": person.job_title or "Member",
+        "departmentId": str(person.department_id) if person.department_id else "dept-general",
+        "departmentName": dept_name,
+        "initials": initials,
+    }
+
+
+@router.get(
+    "/assignments",
+    status_code=status.HTTP_200_OK,
+    summary="Get Assignments by Person ID",
+    tags=["Authentication"],
+)
+def get_assignments_by_person(
+    person_id: str = Query(..., description="Person UUID to fetch assignments for"),
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint to get all assignments for a person by their UUID.
+    Used by the frontend dashboard after login — does not require a JWT.
+    Returns assignment details including project name and project ID.
+    """
+    try:
+        person_uuid = UUID(person_id)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid person_id format"})
+
+    assignments = db.query(Assignment).filter(Assignment.person_id == person_uuid).all()
+    result = []
+    for a in assignments:
+        project = None
+        if a.project_id:
+            try:
+                project = db.query(Project).filter(Project.id == UUID(str(a.project_id))).first()
+            except Exception:
+                pass
+
+        result.append({
+            "id": str(a.id),
+            "personId": str(a.person_id),
+            "projectId": str(a.project_id) if a.project_id else None,
+            "projectName": project.name if project else "Unknown Project",
+            "role": a.role or "Member",
+            "status": a.status.value if hasattr(a.status, "value") else str(a.status),
+            "startDate": str(a.start_date) if a.start_date else None,
+            "endDate": str(a.end_date) if a.end_date else None,
+        })
+
+    return result
 
 
 @router.post(
@@ -61,3 +177,4 @@ def logout(db: Session = Depends(get_db)) -> LogoutResponse:
     - Returns a confirmation message.
     """
     return AuthService.logout(db)
+

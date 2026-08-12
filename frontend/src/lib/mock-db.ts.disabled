@@ -11,6 +11,7 @@ export interface Assignment {
   id: string;
   title: string;
   project: string;
+  projectId?: string;
   status: BadgeStatus;
   priority: AssignmentPriority;
   dueDate: string;
@@ -543,9 +544,114 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
+let isSyncingAssignments = false;
+function triggerAssignmentsSync() {
+  if (typeof window === "undefined" || isSyncingAssignments) return;
+  const token = localStorage.getItem("core_backend_token");
+  if (!token) return;
+
+  isSyncingAssignments = true;
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "") + "/api/v1";
+
+  fetch(`${API_URL}/assignments`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  })
+    .then((res) => {
+      if (res.ok) return res.json();
+      throw new Error("HTTP " + res.status);
+    })
+    .then((data) => {
+      if (Array.isArray(data)) {
+        const mapped: Assignment[] = data.map((a: any) => ({
+          id: a.id || String(a.assignment_id || ""),
+          title: a.role || "Team Contributor",
+          projectId: a.project_id || "",
+          projectName: a.project_name || "Project",
+          ownerId: a.person_id || "",
+          ownerName: a.person_name || "Employee",
+          status: a.status || "in-progress",
+          progress: a.allocation_percent || 100,
+          dueDate: a.end_date ? a.end_date.split("T")[0] : "N/A",
+          priority: "Medium",
+          lastUpdate: "Synced from registry database.",
+          blocker: "None",
+          departmentId: a.department_id || "",
+        }));
+        saveToStorage("assignments", mapped);
+      }
+    })
+    .catch((err) => console.warn("Assignments sync failed:", err))
+    .finally(() => {
+      isSyncingAssignments = false;
+    });
+}
+
+let isSyncingProjects = false;
+function triggerProjectsSync() {
+  if (typeof window === "undefined" || isSyncingProjects) return;
+  const token = localStorage.getItem("core_backend_token");
+  if (!token) return;
+
+  isSyncingProjects = true;
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "") + "/api/v1";
+
+  fetch(`${API_URL}/projects`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  })
+    .then((res) => {
+      if (res.ok) return res.json();
+      throw new Error("HTTP " + res.status);
+    })
+    .then((data) => {
+      if (Array.isArray(data)) {
+        const mapped: ProjectItem[] = data.map((p: any) => {
+          let statusVal: any = "in-progress";
+          let statusLabel = "Active";
+          if (p.status === "completed") {
+            statusVal = "completed";
+            statusLabel = "Completed";
+          } else if (p.status === "on_hold") {
+            statusVal = "on-hold";
+            statusLabel = "On Hold";
+          } else if (p.status === "planned" || p.status === "planning") {
+            statusVal = "waiting";
+            statusLabel = "Planning";
+          }
+
+          return {
+            id: p.id || String(p.project_id || ""),
+            name: p.name || "Project",
+            status: statusVal,
+            statusLabel: statusLabel,
+            health: p.priority === "critical" ? "Off Track" : p.priority === "high" ? "At Risk" : "On Track",
+            owner: p.owner_name || "Manager",
+            ownerId: p.owner_id || "",
+            departmentId: p.department_id || "",
+            dueDate: p.target_date ? p.target_date.split("T")[0] : "Q3 End",
+            nextMilestone: "Milestone Tracking",
+            progress: p.status === "completed" ? 100 : 50,
+            blockers: 0,
+          };
+        });
+        saveToStorage("projects", mapped);
+      }
+    })
+    .catch((err) => console.warn("Projects sync failed:", err))
+    .finally(() => {
+      isSyncingProjects = false;
+    });
+}
+
 // ─── Exported APIs ────────────────────────────────────────────────────────────
 
 export function getAssignments(): Assignment[] {
+  triggerAssignmentsSync();
   return loadFromStorage("assignments", DEFAULT_ASSIGNMENTS);
 }
 
@@ -666,6 +772,7 @@ export function markAllNotificationsRead() {
 }
 
 export function getProjects(): ProjectItem[] {
+  triggerProjectsSync();
   return loadFromStorage("projects", DEFAULT_PROJECTS);
 }
 

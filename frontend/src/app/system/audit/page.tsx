@@ -1,11 +1,23 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { SystemAdminShell } from "@/components/system-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { StatusBadge } from "@/components/status-badge";
-import { getAuditEvents, subscribe, type AuditEvent } from "@/lib/mock-db";
+import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
+import { useAuth } from "@/lib/auth";
+import { getAuditEvents } from "@/lib/api";
+
+export type AuditEvent = {
+  id: string;
+  timestamp: string;
+  actor: string;
+  role: string;
+  action: string;
+  target: string;
+  outcome: BadgeStatus;
+  outcomeLabel: string;
+};
 
 const columns: DataTableColumn<AuditEvent>[] = [
   { key: "id", header: "Event ID", sortable: true },
@@ -23,16 +35,35 @@ const columns: DataTableColumn<AuditEvent>[] = [
 ];
 
 export default function SystemAuditPage() {
+  const { token } = useAuth();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
 
+  const fetchEvents = useCallback(() => {
+    if (!token) return;
+    getAuditEvents(token)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setEvents(list.map((e: any) => ({
+          id: e.id || "",
+          timestamp: e.timestamp || e.created_at || "",
+          actor: e.actor || e.actor_name || e.username || "System",
+          role: e.role || "system-admin",
+          action: e.action || "",
+          target: e.target || "",
+          outcome: (e.outcome === "SUCCESS" || e.outcome === "success") ? "approved" : "rejected",
+          outcomeLabel: e.outcome || "Success",
+        })));
+      })
+      .catch(() => setEvents([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setEvents(getAuditEvents());
-    return subscribe(() => setEvents(getAuditEvents()));
-  }, []);
+    fetchEvents();
+  }, [fetchEvents]);
 
   const filtered = useMemo(
     () =>

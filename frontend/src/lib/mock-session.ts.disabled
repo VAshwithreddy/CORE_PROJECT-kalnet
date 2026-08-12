@@ -146,16 +146,86 @@ export function setCurrentUser(user: CoreUser | null) {
 
 export function loginWithCredentials(email: string, pass: string): { success: boolean; user?: CoreUser; error?: string } {
   const cleanEmail = email.trim().toLowerCase();
+
+  // First try matching a known demo user
   const found = DEMO_USERS.find(u => u.email.toLowerCase() === cleanEmail);
-  if (!found) {
-    return { success: false, error: "Invalid email address or account not found." };
-  }
-  if (found.password !== pass) {
-    return { success: false, error: "Incorrect password. Please try again." };
+  if (found) {
+    if (found.password && found.password !== pass) {
+      return { success: false, error: "Incorrect password. Please try again." };
+    }
+    setCurrentUser(found);
+    return { success: true, user: found };
   }
 
-  setCurrentUser(found);
-  return { success: true, user: found };
+  // In demo mode: accept any email + any non-empty password and create a dynamic user session
+  if (!pass || pass.length < 3) {
+    return { success: false, error: "Password must be at least 3 characters." };
+  }
+
+  const rawName = email.split("@")[0] || "User";
+  const nameFormatted = rawName
+    .split(/[\._\-+]/)
+    .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : ""))
+    .filter(Boolean)
+    .join(" ");
+
+  const initials = rawName.length >= 2
+    ? (rawName[0] + rawName[1]).toUpperCase()
+    : rawName.substring(0, 1).toUpperCase();
+
+  const dynamicUser: CoreUser = {
+    id: `demo-${Date.now()}`,
+    name: nameFormatted || "Demo User",
+    email: email.trim(),
+    role: "employee",
+    roleLabel: "Employee",
+    departmentId: "dept-general",
+    departmentName: "General",
+    initials: initials || "DU",
+  };
+
+  setCurrentUser(dynamicUser);
+  return { success: true, user: dynamicUser };
+}
+
+export function loginWithGoogle(email?: string): { success: boolean; user?: CoreUser; error?: string } {
+  const rawEmail = email ? email.trim() : "";
+  if (!rawEmail) {
+    return { success: false, error: "Please enter your email address to sign in with Google." };
+  }
+
+  const targetEmail = rawEmail.toLowerCase();
+  const found = DEMO_USERS.find(u => u.email.toLowerCase() === targetEmail);
+
+  if (found) {
+    setCurrentUser(found);
+    return { success: true, user: found };
+  }
+
+  const namePart = rawEmail.split("@")[0] || "Google User";
+  const nameFormatted = namePart
+    .split(/[\._\-+]/)
+    .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : ""))
+    .filter(Boolean)
+    .join(" ");
+
+  const initials = namePart.length >= 2 
+    ? (namePart[0] + namePart[1]).toUpperCase() 
+    : namePart.substring(0, 1).toUpperCase();
+
+  const customUser: CoreUser = {
+    id: `google-${Date.now()}`,
+    name: nameFormatted || "Google User",
+    email: rawEmail,
+    role: "employee",
+    roleLabel: "Google Account",
+    departmentId: "dept-engineering",
+    departmentName: "Engineering",
+    initials: initials || "G",
+  };
+
+  setCurrentUser(customUser);
+  return { success: true, user: customUser };
 }
 
 export function logoutUser() {
