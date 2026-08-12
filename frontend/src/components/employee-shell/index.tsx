@@ -4,8 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
-import { DEMO_USERS, getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
-import { getAssignmentsByOwner, getNotificationsByUser, subscribe } from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
 
 interface EmployeeShellProps {
   children: ReactNode;
@@ -20,32 +19,15 @@ export function EmployeeShell({
   breadcrumbs,
   topbarActions,
 }: EmployeeShellProps) {
-  const [currentUser, setCurrentUser] = useState<CoreUser>(DEMO_USERS[0]);
+  const { user } = useAuth();
   const [assignmentCount, setAssignmentCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
-    // Initial fetch
-    setCurrentUser(getCurrentUser());
-    setAssignmentCount(getAssignmentsByOwner(getCurrentUser().id).filter(a => a.status !== "completed").length);
-    setNotificationCount(getNotificationsByUser(getCurrentUser().id).filter(n => !n.isRead).length);
-
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setAssignmentCount(getAssignmentsByOwner(user.id).filter(a => a.status !== "completed").length);
-      setNotificationCount(getNotificationsByUser(user.id).filter(n => !n.isRead).length);
-    });
-
-    const unsubDb = subscribe(() => {
-      setAssignmentCount(getAssignmentsByOwner(getCurrentUser().id).filter(a => a.status !== "completed").length);
-      setNotificationCount(getNotificationsByUser(getCurrentUser().id).filter(n => !n.isRead).length);
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
+    // Backend integration will populate these counts
+    setAssignmentCount(0);
+    setNotificationCount(0);
+  }, [user]);
 
   const navItems: NavItem[] = [
     { label: "Home", href: "/employee/home", icon: <Icon name="home" /> },

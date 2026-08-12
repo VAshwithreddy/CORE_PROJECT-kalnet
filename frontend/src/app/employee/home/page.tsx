@@ -5,102 +5,151 @@ import { EmployeeShell } from "@/components/employee-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
-import { getAssignmentsByOwner, getNotifications, resetDB, subscribe, type Assignment } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { StatusBadge } from "@/components/status-badge";
+import { useAuth } from "@/lib/auth";
+import { getEmployeeDashboard, getAlerts, getDigests, getProjects } from "@/lib/api";
 
-const columns: DataTableColumn<Assignment>[] = [
-  { key: "id", header: "ID", sortable: true },
-  { key: "title", header: "Title", sortable: true },
+type AssignmentRow = {
+  id: string;
+  project: string;
+  title: string;
+  status: string;
+  dueDate: string;
+  allocationPercent: number;
+};
+
+const columns: DataTableColumn<AssignmentRow>[] = [
+  { key: "id", header: "Assignment ID", sortable: true },
+  { key: "project", header: "Project Name", sortable: true },
+  { key: "title", header: "Role", sortable: true },
+  { key: "allocationPercent", header: "Allocation", sortable: true },
   {
     key: "status",
     header: "Status",
     sortable: true,
-    render: (row) => <StatusBadge status={row.status} size="sm" />
+    render: (row) => <StatusBadge status={row.status as any} size="sm" />
   },
-  { key: "priority", header: "Priority", sortable: true },
   { key: "dueDate", header: "Due Date", sortable: true },
 ];
 
 export default function EmployeeHomePage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
-  const [mounted, setMounted] = useState(false);
+  const { user, token, loading: authLoading } = useAuth();
+  
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [digests, setDigests] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
   const [notice, setNotice] = useState("");
-  const activeAssignments = assignments.filter((assignment) => assignment.status === "in-progress").length;
-  const waitingAssignments = assignments.filter((assignment) => assignment.status === "waiting").length;
-  const completedAssignments = assignments.filter((assignment) => assignment.status === "completed").length;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setAssignments(getAssignmentsByOwner(getCurrentUser().id));
-    setUnreadCount(getNotifications().filter(n => !n.isRead && (n.recipientId === getCurrentUser().id || !n.recipientId)).length);
-
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setAssignments(getAssignmentsByOwner(user.id));
-      setUnreadCount(getNotifications().filter(n => !n.isRead && (n.recipientId === user.id || !n.recipientId)).length);
-    });
-
-    const unsubDb = subscribe(() => {
-      setAssignments(getAssignmentsByOwner(getCurrentUser().id));
-      setUnreadCount(getNotifications().filter(n => !n.isRead && (n.recipientId === getCurrentUser().id || !n.recipientId)).length);
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
   }, []);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!token) {
+        setLoadingData(false);
+        return;
+      }
+      try {
+        setLoadingData(true);
+        const [dashRes, alertsRes, digestsRes, projectsRes] = await Promise.all([
+          getEmployeeDashboard(token),
+          getAlerts(token).catch(() => []), // fallback if alerts fail or 403
+          getDigests(token).catch(() => []),
+          getProjects(token).catch(() => []),
+        ]);
+        setDashboardData(dashRes);
+        setAlerts(Array.isArray(alertsRes) ? alertsRes : []);
+        setDigests(Array.isArray(digestsRes) ? digestsRes : []);
+        setProjects(Array.isArray(projectsRes) ? projectsRes : []);
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    
+    if (!authLoading && token) {
+      fetchData();
+    } else if (!authLoading && !token) {
+      setLoadingData(false);
+    }
+  }, [token, authLoading]);
+
+  const assignments: AssignmentRow[] = useMemo(() => {
+    if (!dashboardData?.active_assignments) return [];
+    return dashboardData.active_assignments.map((a: any) => ({
+      id: a.assignment_id?.substring(0, 8) || "N/A",
+      project: a.project_name || "Unknown",
+      title: a.role || "Task",
+      status: a.status,
+      dueDate: a.due_date || "N/A",
+      allocationPercent: a.allocation_percent,
+    }));
+  }, [dashboardData]);
+
   const metrics = useMemo(() => {
-    if (!mounted) return [];
+    if (!mounted || !dashboardData) return [];
+    const summary = dashboardData.summary || {};
     return [
-      { label: "Active Assignments", value: assignments.filter(a => a.status === "in-progress").length },
-      { label: "Waiting on Others", value: assignments.filter(a => a.status === "waiting").length },
-      { label: "Completed Assignments", value: assignments.filter(a => a.status === "completed").length },
-      { label: "Unread Alerts", value: unreadCount },
+      { label: "Active Assignments", value: summary.active_assignments || 0 },
+      { label: "Completed Assignments", value: summary.completed_assignments || 0 },
+      { label: "Blocked Items", value: summary.blocked_count || 0 },
+      { label: "Unread Alerts", value: alerts.length },
     ];
-  }, [assignments, unreadCount, mounted]);
+  }, [dashboardData, alerts, mounted]);
 
-  const handleReset = () => {
-    resetDB();
-    alert("Demo database has been reset to defaults.");
-  };
-
-  if (!mounted) {
+  if (!mounted || authLoading || loadingData) {
     return (
       <EmployeeShell activePath="/employee/home">
         <PageHeader
-          title={`Welcome back, ${currentUser.name.split(' ')[0]}!`}
-          description="Here is an overview of your current work."
-          primaryAction={{ label: "New Request", href: "/employee/requests?new=true" }}
+          title="Loading Workspace..."
+          description="Fetching your real-time data from the backend."
         />
         <div style={{ padding: 40, textAlign: "center", color: "var(--core-text-subtle)" }}>
-          Loading dashboard...
+          <span className="login-dot-pulse" style={{ width: 10, height: 10, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+          <p style={{ marginTop: 12 }}>Syncing with Supabase...</p>
         </div>
       </EmployeeShell>
     );
   }
 
+  if (!user || !dashboardData) {
+    return (
+      <EmployeeShell activePath="/employee/home">
+        <PageHeader
+          title="Data Unavailable"
+          description="We couldn't load your employee data."
+        />
+        <div style={{ padding: 40, textAlign: "center", color: "var(--core-text-subtle)" }}>
+          Please try refreshing or contact support.
+        </div>
+      </EmployeeShell>
+    );
+  }
+
+  const summary = dashboardData.summary || {};
+  const activeAssignmentsCount = summary.active_assignments || 0;
+  const blockedCount = summary.blocked_count || 0;
+  const completedCount = summary.completed_assignments || 0;
+
   return (
     <EmployeeShell activePath="/employee/home">
       <PageHeader
-        title={`Welcome back, ${currentUser.name.split(' ')[0]}!`}
+        title={`Welcome back, ${user.name.split(' ')[0]}!`}
         description="Here is an overview of your current work."
         meta={
           <>
-            <span>{activeAssignments} active assignments</span>
-            <span>{waitingAssignments} waiting</span>
-            <span>{completedAssignments} completed</span>
-            <span>{unreadCount} unread alerts</span>
+            <span>{activeAssignmentsCount} active assignments</span>
+            <span>{blockedCount} blocked</span>
+            <span>{completedCount} completed</span>
+            <span>{alerts.length} unread alerts</span>
           </>
         }
         primaryAction={{ label: "New Request", href: "/employee/requests?new=true" }}
-        secondaryActions={[
-          { label: "Reset Demo Data", onClick: handleReset, variant: "ghost" }
-        ]}
       />
 
       {notice && (
@@ -123,24 +172,26 @@ export default function EmployeeHomePage() {
         <div className="core-panel">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
             <div>
-              <h2>Today Focus Queue</h2>
-              <p>Blocked and due-soon assignments surfaced first.</p>
+              <h2>Recent Status Updates</h2>
+              <p>Your latest updates across assignments.</p>
             </div>
             <a className="core-button core-button-sm" href="/employee/my-work">Open Work</a>
           </div>
           <ul className="mini-list">
-            {assignments
-              .filter((assignment) => assignment.status === "blocked" || assignment.dueBucket === "today" || assignment.dueBucket === "week")
-              .slice(0, 4)
-              .map((assignment) => (
-                <li key={assignment.id} className="mini-list__item">
-                  <span>
-                    <span className="mini-list__title">{assignment.title}</span>
-                    <span className="mini-list__meta">{assignment.project} - {assignment.dueDate}</span>
-                  </span>
-                  <StatusBadge status={assignment.status} size="sm" />
-                </li>
-              ))}
+            {(dashboardData.recent_status_updates || []).slice(0, 4).map((update: any) => (
+              <li key={update.assignment_id + update.created_at} className="mini-list__item">
+                <span>
+                  <span className="mini-list__title">{update.message}</span>
+                  <span className="mini-list__meta">{new Date(update.created_at).toLocaleDateString()}</span>
+                </span>
+                <StatusBadge status={update.status as any} size="sm" />
+              </li>
+            ))}
+            {(!dashboardData.recent_status_updates || dashboardData.recent_status_updates.length === 0) && (
+              <li className="mini-list__item">
+                <span className="mini-list__meta">No recent status updates.</span>
+              </li>
+            )}
           </ul>
         </div>
 
@@ -148,7 +199,7 @@ export default function EmployeeHomePage() {
           <h2>Focus Session</h2>
           <p>Your current work pulse for the day.</p>
           <div style={{ margin: "18px 0", fontSize: 34, fontWeight: 800, color: "var(--core-text)" }}>
-            {assignments.filter((assignment) => assignment.status !== "completed").length}
+            {activeAssignmentsCount}
           </div>
           <p style={{ marginBottom: 16 }}>active assignments remain open.</p>
           <button
@@ -161,8 +212,69 @@ export default function EmployeeHomePage() {
         </div>
       </div>
 
+      {/* Staleness Alerts & Weekly Digests */}
+      <div className="workbench-grid workbench-grid--two" style={{ marginBottom: 32 }}>
+        <div className="core-panel">
+          <h2>Staleness Alerts</h2>
+          <p>Assignments without recent updates.</p>
+          {alerts.length > 0 ? (
+            <ul className="mini-list" style={{ marginTop: 16 }}>
+              {alerts.map((alert: any) => (
+                <li key={alert.id} className="mini-list__item">
+                  <span>
+                    <span className="mini-list__title">{alert.assignment_id}</span>
+                    <span className="mini-list__meta">{alert.days_since_update} days since last update</span>
+                  </span>
+                  <StatusBadge status="blocked" size="sm" />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ marginTop: 16, color: "var(--core-text-muted)" }}>No staleness alerts.</p>
+          )}
+        </div>
+        <div className="core-panel">
+          <h2>Weekly Digests</h2>
+          <p>Your recent weekly performance summaries.</p>
+          {digests.length > 0 ? (
+            <ul className="mini-list" style={{ marginTop: 16 }}>
+              {digests.map((digest: any) => (
+                <li key={digest.id} className="mini-list__item">
+                  <span>
+                    <span className="mini-list__title">Week of {new Date(digest.generated_at).toLocaleDateString()}</span>
+                    <span className="mini-list__meta">{digest.summary}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ marginTop: 16, color: "var(--core-text-muted)" }}>No digests available yet.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="core-panel" style={{ marginBottom: 32 }}>
+        <h2>My Projects</h2>
+        <p>Projects you are currently contributing to.</p>
+        {projects.length > 0 ? (
+          <ul className="mini-list" style={{ marginTop: 16 }}>
+            {projects.map((project: any) => (
+              <li key={project.id} className="mini-list__item">
+                <span>
+                  <span className="mini-list__title">{project.name}</span>
+                  <span className="mini-list__meta">{project.description}</span>
+                </span>
+                <StatusBadge status={project.status as any} size="sm" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ marginTop: 16, color: "var(--core-text-muted)" }}>You are not currently assigned to any active projects.</p>
+        )}
+      </div>
+
       <div className="core-grid-4" style={{ marginBottom: 32 }}>
-        {metrics.map((m) => (
+        {metrics.map((m: any) => (
           <MetricCard
             key={m.label}
             label={m.label}
@@ -174,7 +286,7 @@ export default function EmployeeHomePage() {
       <DataTable
         title="My Active Assignments"
         columns={columns}
-        rows={assignments.filter(a => a.status !== "completed")}
+        rows={assignments}
         rowKey={(row) => row.id}
         rowActions={(row) => [
           {

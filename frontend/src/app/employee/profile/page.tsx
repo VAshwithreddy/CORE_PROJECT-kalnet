@@ -4,23 +4,15 @@ import { useState, useEffect } from "react";
 import { EmployeeShell } from "@/components/employee-shell";
 import { PageHeader } from "@/components/page-header";
 import { TextInput, TextArea, SelectInput } from "@/components/form-controls";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
-import { getTeamMembers } from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
 
 export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const { user } = useAuth();
 
-  useEffect(() => {
-    return subscribeSession((user) => setCurrentUser(user));
-  }, []);
-
-  // Find manager from team data
-  const teamMembers = getTeamMembers();
-  const selfMember = teamMembers.find((m) => m.id === currentUser.id);
-  const manager = selfMember?.manager ?? "—";
-  const location = selfMember?.location ?? "Remote";
+  const manager = "—"; // In a real app, fetch manager from backend
+  const location = "Remote";
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +51,10 @@ export default function ProfilePage() {
             These details are managed by HR. If something is incorrect, please submit an HR Request.
           </p>
 
-          <TextInput label="Legal Name" value={currentUser.name} readOnly disabled />
-          <TextInput label="Employee ID" value={currentUser.id} readOnly disabled />
-          <TextInput label="Job Title" value={currentUser.roleLabel} readOnly disabled />
-          <TextInput label="Department" value={currentUser.departmentName} readOnly disabled />
+          <TextInput label="Legal Name" value={user?.name || ""} readOnly disabled />
+          <TextInput label="Employee ID" value={user?.id || ""} readOnly disabled />
+          <TextInput label="Job Title" value={user?.roleLabel || ""} readOnly disabled />
+          <TextInput label="Department" value={user?.departmentName || ""} readOnly disabled />
           <TextInput label="Manager" value={manager} readOnly disabled />
           <TextInput label="Work Location" value={location} readOnly disabled />
         </div>

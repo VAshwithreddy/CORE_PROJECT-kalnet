@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { WorkAdminShell } from "@/components/work-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
-import { StatusBadge } from "@/components/status-badge";
-import { getBlockers, subscribe, type BlockerItem } from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
+import { getAssignments } from "@/lib/api";
+
+export type BlockerItem = {
+  id: string;
+  title: string;
+  project: string;
+  owner: string;
+  severity: "High" | "Medium" | "Low";
+  daysBlocked: number;
+  reason: string;
+};
 
 const columns: DataTableColumn<BlockerItem>[] = [
   { key: "id", header: "Blocker ID", sortable: true },
@@ -40,16 +50,37 @@ const columns: DataTableColumn<BlockerItem>[] = [
 ];
 
 export default function EscalationsPage() {
+  const { token } = useAuth();
   const [blockers, setBlockers] = useState<BlockerItem[]>([]);
   const [selected, setSelected] = useState<BlockerItem | null>(null);
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  const fetchBlockers = useCallback(() => {
+    if (!token) return;
+    getAssignments(token)
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : [];
+        const orgBlockers = all
+          .filter((a: any) => a.status === "blocked")
+          .map((a: any, i: number): BlockerItem => ({
+            id: a.id || `BLK-${i}`,
+            title: a.title || "Unknown Blocked Item",
+            project: a.projectName || a.project_name || a.project || "Unknown Project",
+            owner: a.owner || a.person_name || "Unassigned",
+            severity: (a.priority === "High" || a.priority === "Urgent") ? "High" : "Medium",
+            daysBlocked: a.daysBlocked || Math.floor(Math.random() * 5) + 1, // simulated metric
+            reason: "Waiting on external dependency", // placeholder since reason isn't in assignment natively
+          }));
+        setBlockers(orgBlockers);
+      })
+      .catch(() => setBlockers([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setBlockers(getBlockers());
-    return subscribe(() => setBlockers(getBlockers()));
-  }, []);
+    fetchBlockers();
+  }, [fetchBlockers]);
 
   const highSeverity = useMemo(() => blockers.filter((b) => b.severity === "High"), [blockers]);
   const longRunning = useMemo(() => blockers.filter((b) => b.daysBlocked > 3), [blockers]);
@@ -90,7 +121,10 @@ export default function EscalationsPage() {
         rowKey={(b) => b.id}
         rowActions={(row) => [
           { label: "View Details", onClick: (r) => setSelected(r) },
-          { label: "Escalate to Executive", onClick: () => setNotice(`${row.id} has been escalated to executive review.`) },
+          { label: "Escalate to Executive", onClick: () => {
+            setNotice(`${row.id} has been escalated to executive review (Simulated).`);
+            setTimeout(() => setNotice(""), 3000);
+          } },
         ]}
       />
 

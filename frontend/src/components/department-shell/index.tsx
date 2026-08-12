@@ -4,7 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
-import { DEMO_USERS, getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
 
 interface DepartmentShellProps {
   children: ReactNode;
@@ -21,14 +21,9 @@ export function DepartmentShell({
   topbarActions,
   departmentName,
 }: DepartmentShellProps) {
-  const [currentUser, setCurrentUser] = useState<CoreUser>(DEMO_USERS[0]);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    setCurrentUser(getCurrentUser());
-    return subscribeSession((newUser) => setCurrentUser(newUser));
-  }, []);
-
-  const effectiveDepartmentName = departmentName || currentUser.departmentName;
+  const effectiveDepartmentName = departmentName || user?.departmentName || "Loading...";
 
   const navItems: NavItem[] = [
     { label: "Home", href: "/department/home", icon: <Icon name="home" /> },

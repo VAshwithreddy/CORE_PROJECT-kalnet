@@ -30,6 +30,7 @@ from src.api.dashboards import router as dashboards_router
 from src.api.digests import router as digests_router
 from src.api.alerts import router as alerts_router
 from src.api.system import router as system_router
+from src.api.notifications import router as notifications_router
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -152,6 +153,11 @@ def create_app() -> FastAPI:
     app.include_router(
         system_router,
         prefix="/api/v1/system",
+    )
+    app.include_router(
+        notifications_router,
+        prefix="/api/v1/notifications",
+        tags=["Notifications"],
     )
 
     return app

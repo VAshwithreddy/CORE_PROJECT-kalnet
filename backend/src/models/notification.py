@@ -16,6 +16,7 @@ class Notification(Base):
     type = Column(String, nullable=False)        # e.g. assignment_created, status_blocked
     title = Column(String, nullable=False)
     message = Column(Text, nullable=True)
+    action_url = Column(String, nullable=True)   # optional deep-link for the notification
     is_read = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -14,7 +14,7 @@ class Person(Base):
     __tablename__ = "people"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    auth_user_id = Column(UUID(as_uuid=True), nullable=True)
+    auth_user_id = Column(String, nullable=True)
     full_name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True, index=True)
     job_title = Column(String, nullable=True)

@@ -6,8 +6,22 @@ import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
-import { getProjectsByDepartment, getBlockers, getTeamMembers, resetDB, subscribe, type ProjectItem } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getProjects, getBlockers, getPeople } from "@/lib/api";
+
+type ProjectHealth = "On Track" | "At Risk" | "Off Track" | "Delivered";
+
+type ProjectItem = {
+  id: string;
+  name: string;
+  departmentId: string;
+  ownerId: string;
+  owner: string;
+  status: "new" | "waiting" | "in-progress" | "blocked" | "completed" | "archived";
+  statusLabel: string;
+  health: ProjectHealth;
+  nextMilestone?: string;
+};
 
 const healthStatusMap = {
   "On Track": "approved" as BadgeStatus,
@@ -35,50 +49,41 @@ const columns: DataTableColumn<ProjectItem>[] = [
 ];
 
 export default function DepartmentHomePage() {
+  const { user, token } = useAuth();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [blockerCount, setBlockerCount] = useState(0);
-  const [teamCount, setTeamCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
+  const [departmentMembers, setDepartmentMembers] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setProjects(getProjectsByDepartment(getCurrentUser().departmentId));
-    setBlockerCount(getBlockers().length); // In a real app, filter blockers by department
-    setTeamCount(getTeamMembers().filter(m => !m.departmentId || m.departmentId === getCurrentUser().departmentId).length);
+    if (!token || !user) return;
 
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setProjects(getProjectsByDepartment(user.departmentId));
-      setTeamCount(getTeamMembers().filter(m => !m.departmentId || m.departmentId === user.departmentId).length);
+    Promise.all([
+      getProjects(token).catch(() => []),
+      getBlockers(token).catch(() => []),
+      getPeople(token).catch(() => []),
+    ]).then(([projData, blockerData, teamData]) => {
+      const allProjects = Array.isArray(projData) ? projData : [];
+      setProjects(allProjects.filter((p: any) => p.departmentId === user.departmentId));
+
+      const allBlockers = Array.isArray(blockerData) ? blockerData : [];
+      setBlockerCount(allBlockers.length);
+
+      const allTeam = Array.isArray(teamData) ? teamData : [];
+      setDepartmentMembers(allTeam.filter((m: any) => !m.departmentId || m.departmentId === user.departmentId));
     });
-
-    const unsubDb = subscribe(() => {
-      setProjects(getProjectsByDepartment(getCurrentUser().departmentId));
-      setBlockerCount(getBlockers().length);
-      setTeamCount(getTeamMembers().filter(m => !m.departmentId || m.departmentId === getCurrentUser().departmentId).length);
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
+  }, [token, user]);
 
   const metrics = useMemo(() => {
     if (!mounted) return [];
     return [
       { label: "Active Projects", value: projects.filter(p => p.status !== "completed").length },
       { label: "Active Blockers", value: blockerCount },
-      { label: "Team Members", value: teamCount },
+      { label: "Team Members", value: departmentMembers.length },
       { label: "On Time Delivery", value: "92%" },
     ];
-  }, [projects, blockerCount, teamCount, mounted]);
-
-  const handleReset = () => {
-    resetDB();
-    alert("Demo database has been reset to defaults.");
-  };
+  }, [projects, blockerCount, departmentMembers, mounted]);
 
   if (!mounted) {
     return (
@@ -95,16 +100,13 @@ export default function DepartmentHomePage() {
     );
   }
 
-  const departmentMembers = getTeamMembers().filter(
-    (member) => !member.departmentId || member.departmentId === currentUser.departmentId,
-  );
   const activeProjects = projects.filter((project) => project.status !== "completed").length;
 
   return (
     <DepartmentShell activePath="/department/home">
       <PageHeader
-        title={`${currentUser.departmentName} Overview`}
-        description={`Welcome back, ${currentUser.name.split(' ')[0]}. Here is the high-level status of your department.`}
+        title={`${user?.departmentName || "Department"} Overview`}
+        description={`Welcome back, ${user?.name?.split(' ')[0] || "User"}. Here is the high-level status of your department.`}
         meta={
           <>
             <span>{activeProjects} active projects</span>
@@ -113,9 +115,6 @@ export default function DepartmentHomePage() {
           </>
         }
         primaryAction={{ label: "New Project", href: "/department/projects?new=true" }}
-        secondaryActions={[
-          { label: "Reset Demo Data", onClick: handleReset, variant: "ghost" }
-        ]}
       />
 
       <div className="workbench-grid">
