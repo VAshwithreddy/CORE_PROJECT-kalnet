@@ -29,6 +29,13 @@ async function apiRequest(path: string, token?: string, options?: { method?: str
   return res.json();
 }
 
+export function loginToBackend(username: string, password?: string) {
+  return apiRequest("/auth/login", undefined, {
+    method: "POST",
+    body: { username, password: password || "firebase_auth_passed" },
+  });
+}
+
 export async function getAssignments(token?: string) {
   const res = await apiRequest("/assignments", token);
   return Array.isArray(res)

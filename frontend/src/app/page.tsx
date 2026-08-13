@@ -356,7 +356,7 @@ function TelemetrySection() {
 /* ─── BENTO COMPONENTS (ROLES, ROUTING, DIGEST, AUDIT, CAPACITY) ─── */
 
 function RoleMatrixWidget() {
-  const [activeRole, setActiveRole] = useState<"employee" | "department" | "executive" | "system-admin">("employee");
+  const [activeRole, setActiveRole] = useState<"employee" | "department_head" | "executive" | "system_admin">("employee");
 
   const matrix = {
     employee: [
@@ -366,7 +366,7 @@ function RoleMatrixWidget() {
       { name: "Executive Intelligence", granted: false },
       { name: "System Security Admin", granted: false },
     ],
-    department: [
+    department_head: [
       { name: "Read Tasks & Workflows", granted: true },
       { name: "Submit Work Requests", granted: true },
       { name: "Department Budgeting", granted: true },
@@ -380,7 +380,7 @@ function RoleMatrixWidget() {
       { name: "Executive Intelligence", granted: true },
       { name: "System Security Admin", granted: false },
     ],
-    "system-admin": [
+    system_admin: [
       { name: "Read Tasks & Workflows", granted: true },
       { name: "Submit Work Requests", granted: true },
       { name: "Department Budgeting", granted: true },
@@ -393,7 +393,7 @@ function RoleMatrixWidget() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between", gap: 16 }}>
       <div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-          {(["employee", "department", "executive", "system-admin"] as const).map((r) => (
+          {(["employee", "department_head", "executive", "system_admin"] as const).map((r) => (
             <button
               key={r}
               type="button"
@@ -406,7 +406,7 @@ function RoleMatrixWidget() {
                 cursor: "pointer", transition: "all 0.2s ease",
               }}
             >
-              {r === "employee" ? "👤 Emp" : r === "department" ? "🏢 Dept Head" : r === "executive" ? "📊 Exec" : "🔐 SysAdmin"}
+              {r === "employee" ? "👤 Emp" : r === "department_head" ? "🏢 Dept Head" : r === "executive" ? "📊 Exec" : "🔐 SysAdmin"}
             </button>
           ))}
         </div>
@@ -703,7 +703,7 @@ function SecurityComplianceWidget() {
 /* ─── WORKSPACE SANDBOX SECTION ─────────────────────────────────── */
 function WorkspaceSandboxSection() {
   const router = useRouter();
-  const [tab, setTab] = useState<"employee" | "department" | "executive" | "work-admin">("employee");
+  const [tab, setTab] = useState<"employee" | "department_head" | "executive" | "work_admin">("employee");
 
   const tabsData = {
     employee: {
@@ -717,7 +717,7 @@ function WorkspaceSandboxSection() {
       actions: ["Submit Time Off", "Request IT Access", "Update Task Status"],
       accent: "var(--core-brand)",
     },
-    department: {
+    department_head: {
       roleTitle: "Department Head Operations Hub",
       quote: "Oversee team assignments, resolve blockers, and approve budget and intake requests.",
       stats: [
@@ -739,7 +739,7 @@ function WorkspaceSandboxSection() {
       actions: ["View Risk Heatmap", "Export Board Digest", "Audit Portfolio"],
       accent: "var(--core-executive)",
     },
-    "work-admin": {
+    work_admin: {
       roleTitle: "Operations Admin Desk",
       quote: "Intelligent intake classification, SLA tracking, and cross-department escalations.",
       stats: [
@@ -777,7 +777,7 @@ function WorkspaceSandboxSection() {
       {/* Tabs */}
       <Reveal delay={100}>
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginBottom: 36 }}>
-          {(["employee", "department", "executive", "work-admin"] as const).map((tKey) => (
+          {(["employee", "department_head", "executive", "work_admin"] as const).map((tKey) => (
             <button
               key={tKey}
               type="button"
@@ -791,7 +791,7 @@ function WorkspaceSandboxSection() {
                 cursor: "pointer", transition: "all 0.25s ease",
               }}
             >
-              {tKey === "employee" ? "👤 Employee Desk" : tKey === "department" ? "🏢 Department Head" : tKey === "executive" ? "📊 Executive Overview" : "⚙️ Operations Admin"}
+              {tKey === "employee" ? "👤 Employee Desk" : tKey === "department_head" ? "🏢 Department Head" : tKey === "executive" ? "📊 Executive Overview" : "⚙️ Operations Admin"}
             </button>
           ))}
         </div>

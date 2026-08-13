@@ -55,15 +55,15 @@ def lookup_user_by_email(
 
     # Map DB roles to frontend roles
     role_map = {
-        "department_head": "department",
-        "work_admin": "work-admin",
-        "system_admin": "system-admin",
+        "department_head": "department_head",
+        "work_admin": "work_admin",
+        "system_admin": "system_admin",
         "executive": "executive",
         "employee": "employee",
         "manager": "employee",
         "team_leader": "employee",
     }
-    frontend_role = role_map.get(role_value, "employee")
+    frontend_role = role_map.get(role_value, role_value)
 
     full_name = person.full_name or ""
     initials = "".join(part[0].upper() for part in full_name.split() if part)[:2] or (email[0].upper() if email else "U")

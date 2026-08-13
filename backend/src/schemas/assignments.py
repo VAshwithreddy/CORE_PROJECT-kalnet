@@ -50,6 +50,7 @@ class AssignmentCreate(BaseModel):
 
 
 class AssignmentUpdate(BaseModel):
+    person_id: Optional[Any] = None
     role: Optional[str] = None
     status: Optional[str] = None
     allocation_percent: Optional[int] = None

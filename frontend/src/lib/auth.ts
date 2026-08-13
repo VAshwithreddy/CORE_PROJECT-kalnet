@@ -49,9 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         try {
           // Step 1: Look up existing employee record in Supabase via FastAPI backend
-          const lookupRes = await fetch(
-            `${API_URL}/auth/lookup?email=${encodeURIComponent(fbUser.email)}`
-          );
+          let lookupRes: Response;
+          try {
+            lookupRes = await fetch(
+              `${API_URL}/auth/lookup?email=${encodeURIComponent(fbUser.email)}`
+            );
+          } catch (fetchErr: any) {
+            throw new Error(`Unable to connect to backend server at ${API_URL}. Please ensure the FastAPI backend is running.`);
+          }
 
           if (!lookupRes.ok) {
             const errData = await lookupRes.json().catch(() => ({}));
@@ -61,14 +66,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await lookupRes.json();
 
           // Step 2: Get a signed backend JWT via /auth/login
-          const loginRes = await fetch(`${API_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: fbUser.email, password: "firebase_auth_passed" }),
-          });
+          let loginRes: Response | null = null;
+          try {
+            loginRes = await fetch(`${API_URL}/auth/login`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: fbUser.email, password: "firebase_auth_passed" }),
+            });
+          } catch (err) {
+            console.warn("Login token fetch failed:", err);
+          }
 
           let access_token: string | null = null;
-          if (loginRes.ok) {
+          if (loginRes && loginRes.ok) {
             const tokenData = await loginRes.json();
             access_token = tokenData.access_token;
             if (typeof window !== "undefined" && access_token) {
@@ -98,13 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           setError(null);
         } catch (err: any) {
-          console.error("Auth failed:", err);
-          // Handle network/API errors gracefully without showing "Failed to fetch" on initial load
+          console.warn("Auth check failed:", err.message || err);
           const isActiveAttempt = typeof window !== "undefined" && sessionStorage.getItem("active_login_attempt") === "true";
           if (isActiveAttempt) {
             setError(err.message || "Your account is not linked to an employee profile.");
-          } else {
-            console.warn("Silent background auth error (e.g. backend down on mount):", err.message);
           }
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("active_login_attempt");
