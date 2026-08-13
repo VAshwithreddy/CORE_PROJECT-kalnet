@@ -118,10 +118,10 @@ export default function SystemAuditPage() {
         >
           <option value="all">All Roles</option>
           <option value="employee">Employee</option>
-          <option value="department">Department</option>
+          <option value="department_head">Department Head</option>
           <option value="executive">Executive</option>
-          <option value="work-admin">Work Admin</option>
-          <option value="system-admin">System Admin</option>
+          <option value="work_admin">Work Admin</option>
+          <option value="system_admin">System Admin</option>
         </select>
       </div>
 

@@ -40,7 +40,7 @@ export default function DepartmentHeadsPage() {
         getPeople(token).catch(() => [])
       ]);
       
-      const heads = (Array.isArray(users) ? users : []).filter((u: any) => u.role === "department");
+      const heads = (Array.isArray(users) ? users : []).filter((u: any) => u.role === "department" || u.role === "department_head");
       const allPeople = Array.isArray(people) ? people : [];
       
       setDeptHeads(heads.map((u: any): DeptHeadRow => {

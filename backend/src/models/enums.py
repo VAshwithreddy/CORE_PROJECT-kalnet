@@ -51,6 +51,29 @@ class AlertStatus(str, enum.Enum):
     open = "open"
     resolved = "resolved"
 
+class NotificationSeverity(str, enum.Enum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class NotificationEntityType(str, enum.Enum):
+    PROJECT = "project"
+    ASSIGNMENT = "assignment"
+
+class NotificationType(str, enum.Enum):
+    WORK_ASSIGNED = "WORK_ASSIGNED"
+    WORK_REASSIGNED = "WORK_REASSIGNED"
+    BLOCKER_CREATED = "BLOCKER_CREATED"
+    BLOCKER_RESOLVED = "BLOCKER_RESOLVED"
+    CRITICAL_BLOCKER = "CRITICAL_BLOCKER"
+    WORK_COMPLETED = "WORK_COMPLETED"
+    PRIORITY_CHANGED = "PRIORITY_CHANGED"
+    WORK_OVERDUE = "WORK_OVERDUE"
+    DEADLINE_APPROACHING = "DEADLINE_APPROACHING"
+    ESCALATION_REQUIRED = "ESCALATION_REQUIRED"
+    STALE_ASSIGNMENT = "STALE_ASSIGNMENT"
+
 class ApprovalRequestType(str, enum.Enum):
     profile_update = "profile_update"
     assignment_change = "assignment_change"

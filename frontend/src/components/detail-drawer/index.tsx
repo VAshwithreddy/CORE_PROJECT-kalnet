@@ -1,7 +1,7 @@
 /**
  * DetailDrawer
  *
- * Right-side overlay drawer used to inspect or edit a record without leaving
+ * Centered detail modal used to inspect or edit a record without leaving
  * the current context (e.g., viewing an assignment from a data table).
  *
  * Features:
@@ -42,7 +42,7 @@ export interface DetailDrawerProps {
   isOpen: boolean;
   /** Function to call when close button, backdrop, or Escape is pressed. */
   onClose: () => void;
-  /** Drawer width variant. "wide" is 640px, default is 480px. */
+  /** Drawer width variant. "wide" is 920px, default is 760px. */
   size?: "default" | "wide";
 
   // Header
@@ -160,6 +160,7 @@ export function DetailDrawer({
       <div className="drawer-backdrop" onClick={handleClose} aria-hidden="true" />
       <div
         className={cls}
+        data-size={size}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"

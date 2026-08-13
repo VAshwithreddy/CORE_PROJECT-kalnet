@@ -1,0 +1,10 @@
+[Unit]
+Description=CORE notification sweep (deadline/overdue/escalation checks + AI enrichment)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/core/backend
+EnvironmentFile=/opt/core/backend/.env
+ExecStart=/opt/core/backend/.venv/bin/python scripts/run_notification_sweep.py --enrich --quiet
+User=core
