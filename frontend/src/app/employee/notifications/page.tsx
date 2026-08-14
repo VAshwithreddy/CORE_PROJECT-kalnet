@@ -6,15 +6,39 @@ import { EmployeeShell } from "@/components/employee-shell";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { getNotificationsByUser, markNotificationsRead, markAllNotificationsRead, subscribe, type NotificationItem } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import type { BadgeStatus } from "@/components/status-badge";
+import { useAuth } from "@/lib/auth";
+import { getNotifications, markNotificationsRead } from "@/lib/api";
+
+type NotificationItem = {
+  id: string;
+  type: "info" | "alert" | "success" | "warning";
+  title: string;
+  message: string;
+  isRead: boolean;
+  timestamp: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  actionRequired?: boolean;
+};
+
+
+
+function notifTypeToBadge(type: NotificationItem["type"]): BadgeStatus {
+  switch (type) {
+    case "alert":   return "blocked";
+    case "warning": return "waiting";
+    case "success": return "approved";
+    default:        return "new";
+  }
+}
 
 const columns: DataTableColumn<NotificationItem>[] = [
   {
-    key: "status",
+    key: "type",
     header: "Urgency",
     sortable: true,
-    render: (row) => <StatusBadge status={row.status} size="sm" label={row.statusLabel} />,
+    render: (row) => <StatusBadge status={notifTypeToBadge(row.type)} size="sm" label={row.type} />,
   },
   {
     key: "title",
@@ -30,37 +54,51 @@ const columns: DataTableColumn<NotificationItem>[] = [
       </div>
     ),
   },
-  { key: "type", header: "Category", sortable: true },
-  { key: "date", header: "Received", sortable: true },
+  { key: "timestamp", header: "Received", sortable: true },
 ];
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function NotificationsPage() {
+  const { user, token } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
   const [filter, setFilter] = useState("all");
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setNotifications(getNotificationsByUser(getCurrentUser().id));
+    if (user && token) {
+      getNotifications(token)
+        .then((data) => {
+          setNotifications(Array.isArray(data) ? data : []);
+        })
+        .catch((err) => {
+          console.error("Failed to load notifications:", err);
+          setNotifications([]);
+        });
+    }
+  }, [user, token]);
 
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setNotifications(getNotificationsByUser(user.id));
-    });
+  const handleMarkAsRead = (selectedKeys: string[]) => {
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (selectedKeys.includes(n.id) ? { ...n, isRead: true } : n))
+    );
+    setNotice(`${selectedKeys.length} notification(s) marked as read.`);
+    setTimeout(() => setNotice(""), 4000);
+    // Persist to backend (best-effort)
+    if (token) markNotificationsRead(selectedKeys, token).catch(() => null);
+  };
 
-    const unsubDb = subscribe(() => {
-      setNotifications(getNotificationsByUser(getCurrentUser().id));
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
+  const handleMarkAllAsRead = () => {
+    const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotice("All notifications marked as read.");
+    setTimeout(() => setNotice(""), 4000);
+    // Persist to backend (best-effort)
+    if (token && unreadIds.length) markNotificationsRead(unreadIds, token).catch(() => null);
+  };
 
   const filteredNotifications = useMemo(() => {
     if (filter === "unread") return notifications.filter((n) => !n.isRead);
@@ -85,18 +123,6 @@ export default function NotificationsPage() {
     ],
     [notifications]
   );
-
-  const handleMarkAsRead = (selectedKeys: string[]) => {
-    markNotificationsRead(selectedKeys);
-    setNotice(`${selectedKeys.length} notification(s) marked as read.`);
-    setTimeout(() => setNotice(""), 4000);
-  };
-
-  const handleMarkAllAsRead = () => {
-    markAllNotificationsRead();
-    setNotice("All notifications marked as read.");
-    setTimeout(() => setNotice(""), 4000);
-  };
 
   if (!mounted) {
     return (
@@ -184,13 +210,12 @@ export default function NotificationsPage() {
           {
             label: row.isRead ? "Mark Unread" : "Mark Read",
             onClick: () => {
-              if (row.isRead) {
-                const nextNotifs = getNotificationsByUser(currentUser.id).map(n => n.id === row.id ? { ...n, isRead: false } : n);
-                localStorage.setItem("core_db_notifications", JSON.stringify(nextNotifs));
-                window.dispatchEvent(new Event("storage"));
-              } else {
-                markNotificationsRead([row.id]);
-              }
+              const next = !row.isRead;
+              setNotifications((prev) =>
+                prev.map((n) => (n.id === row.id ? { ...n, isRead: next } : n))
+              );
+              // Persist read → backend (mark-read only; unread is local)
+              if (token && next) markNotificationsRead([row.id], token).catch(() => null);
             },
           },
         ]}

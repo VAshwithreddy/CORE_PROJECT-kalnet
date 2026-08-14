@@ -950,3 +950,4 @@ class NotificationService:
         queue (see architecture doc §"No job queue")."""
         created = NotificationService.notify(db, NotificationRulesEngine.sweep_deadlines_and_overdue)
         return len(created)
+

@@ -73,7 +73,16 @@ def run_tests():
                 headers[h["key"]] = h["value"]
 
             if "Authorization" not in headers or "{{" in headers.get("Authorization", ""):
-                token = _make_token("22222222-2222-2222-2222-222222222206", "system_admin")
+                from src.core.database import SessionLocal
+                from src.models.person import Person
+                from src.models.enums import Role
+                db = SessionLocal()
+                try:
+                    admin = db.query(Person).filter(Person.role == Role.system_admin).first()
+                    admin_id = str(admin.id) if admin else "22222222-2222-2222-2222-222222222215"
+                finally:
+                    db.close()
+                token = _make_token(admin_id, "system_admin")
                 headers["Authorization"] = f"Bearer {token}"
 
             body = None

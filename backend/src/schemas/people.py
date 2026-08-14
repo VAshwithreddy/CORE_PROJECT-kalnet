@@ -13,6 +13,7 @@ class PersonResponse(BaseModel):
     full_name: str = Field(..., description="Person's full name", example="Alice Smith")
     job_title: Optional[str] = Field(None, description="Person's job title", example="Software Engineer")
     department_name: Optional[str] = Field(None, description="Name of the department", example="Engineering")
+    department_id: Optional[UUID] = Field(None, description="ID of the department")
     role: str = Field(..., description="Role in the system", example="employee")
     availability: str = Field(..., description="Availability status", example="available")
 

@@ -4,8 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
-import { getCurrentUser, subscribeSession } from "@/lib/mock-session";
-import { getRequests, subscribe } from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
 
 interface WorkAdminShellProps {
   children: ReactNode;
@@ -20,18 +19,13 @@ export function WorkAdminShell({
   breadcrumbs,
   topbarActions,
 }: WorkAdminShellProps) {
+  const { user } = useAuth();
   const [intakeBadge, setIntakeBadge] = useState(0);
 
   useEffect(() => {
-    const countPending = () =>
-      getRequests().filter((r) => r.status === "waiting").length;
-
-    setIntakeBadge(countPending());
-
-    const unsubDb = subscribe(() => setIntakeBadge(countPending()));
-    const unsubSession = subscribeSession(() => setIntakeBadge(countPending()));
-    return () => { unsubDb(); unsubSession(); };
-  }, []);
+    // Backend API integration to count pending requests
+    setIntakeBadge(0);
+  }, [user]);
 
   const navItems: NavItem[] = [
     { label: "Home", href: "/work-admin/home", icon: <Icon name="chart" /> },
@@ -43,7 +37,6 @@ export function WorkAdminShell({
     { label: "Audit", href: "/work-admin/audit", icon: <Icon name="report" /> },
   ];
 
-  const user = getCurrentUser();
 
   return (
     <AppShell

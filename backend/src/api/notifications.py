@@ -116,13 +116,11 @@ def run_notification_sweep(db: Session = Depends(get_db)) -> NotificationSweepRe
     are due. Idempotent within the same calendar day — see
     NotificationRulesEngine.sweep_deadlines_and_overdue's day-scoped
     dedup_key; running this twice in a row creates zero additional rows
-    the second time (verified in test_notifications_rules_engine.py::
-    test_sweep_is_idempotent_across_repeated_runs).
+    the second time.
 
     CORE has no in-process scheduler — this endpoint is the integration
     point for an external scheduler (e.g. a periodic cron job or CI
-    schedule) to call, analogous to `POST /api/v1/digests/weekly/run`.
-    Restricted to work_admin / system_admin.
+    schedule) to call. Restricted to work_admin / system_admin.
     """
     created = NotificationService.run_sweep(db)
     return NotificationSweepResponse(
@@ -147,8 +145,7 @@ def enrich_notification(
     Best-effort AI enrichment for one of the caller's own notifications.
     Always returns 200 with the notification whether or not enrichment
     was actually produced (AI disabled / unavailable / low-value output
-    all just mean `enrichment` stays null) — this is advisory intelligence
-    layered on a notification that already exists and is already valid.
+    all just mean `enrichment` stays null).
     """
     row = db.query(Notification).filter(Notification.id == notification_id).first()
     if not row:
@@ -169,9 +166,8 @@ def enrich_notification(
 )
 def enrich_pending_notifications(db: Session = Depends(get_db)) -> dict:
     """
-    Batch AI enrichment for notifications that don't have one yet. Same
-    "no in-process scheduler" pattern as /sweep — an external scheduler
-    calls this periodically. Restricted to work_admin / system_admin.
+    Batch AI enrichment for notifications that don't have one yet.
+    Restricted to work_admin / system_admin.
     """
     enriched = NotificationIntelligenceService.enrich_pending(db)
     return {"message": f"Enriched {enriched} notification(s).", "enriched_count": enriched}
@@ -188,10 +184,7 @@ def mark_notification_read(
     db: Session = Depends(get_rls_db_for(get_current_user)),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> NotificationResponse:
-    """Mark a single notification as read. A user may only mark their own.
-    A malformed ID is rejected with 422 by FastAPI before this handler
-    runs; a well-formed but non-existent ID is a 404 (see
-    NotificationService.mark_read) — never a substituted record."""
+    """Mark a single notification as read. A user may only mark their own."""
     row = NotificationService.mark_read(db, notification_id, actor_person_id=current_user.person_id)
     return NotificationResponse.model_validate(row)
 
@@ -211,7 +204,7 @@ def acknowledge_notification(
     Acknowledge a notification that requires it (e.g. a CRITICAL_BLOCKER
     or ESCALATION_REQUIRED alert). Raises 400 if the notification doesn't
     require acknowledgement, 403 if it isn't the caller's own, 404 if it
-    doesn't exist, 422 if `notification_id` isn't a valid UUID at all.
+    doesn't exist.
     """
     row = NotificationService.acknowledge(db, notification_id, actor_person_id=current_user.person_id)
     return NotificationResponse.model_validate(row)

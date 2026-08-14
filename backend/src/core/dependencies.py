@@ -163,13 +163,14 @@ def get_current_user(
         logger.warning(f"JWT validation failed: 'sub' claim '{sub}' is not a valid UUID.")
         raise credentials_exc
 
-    # --- Resolve the real people.id via auth_user_id lookup ---
-    # sub is Supabase's auth.users.id, NOT people.id. RLS/queries filter on
-    # people.id (assignments.person_id etc.), so we must look it up.
+    # --- Resolve the real people.id via auth_user_id or id lookup ---
+    # sub can be Supabase's auth.users.id or people.id directly (from backend auth).
     from src.models.person import Person
-    person = db.query(Person).filter(Person.auth_user_id == auth_user_id).first()
+    person = db.query(Person).filter(
+        (Person.auth_user_id == str(auth_user_id)) | (Person.id == auth_user_id)
+    ).first()
     if not person:
-        logger.warning(f"JWT validation failed: no Person found with auth_user_id '{auth_user_id}'.")
+        logger.warning(f"JWT validation failed: no Person found with auth_user_id or id '{auth_user_id}'.")
         raise credentials_exc
 
     role = payload.get("role")

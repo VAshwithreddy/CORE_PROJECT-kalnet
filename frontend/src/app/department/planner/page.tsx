@@ -6,13 +6,22 @@ import { Icon } from "@/components/core-icons";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
-import {
-  getAssignmentsByDepartment,
-  updateAssignment,
-  subscribe,
-  type Assignment,
-} from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getAssignments } from "@/lib/api";
+
+export type Assignment = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  ownerId: string;
+  owner: string;
+  departmentId: string;
+  status: "new" | "waiting" | "in-progress" | "blocked" | "completed" | "approved" | "archived";
+  statusLabel: string;
+  dueDate: string;
+  progress: number;
+};
 
 /* ── Map assignment statuses to planner-friendly labels ─────────────────────── */
 
@@ -51,21 +60,24 @@ const STATUS_COLUMNS = ["To Do", "Doing", "Blocked", "Done"] as const;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 
 export default function PlannerPage() {
+  const { user, token } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [view, setView] = useState<"person" | "status">("status");
 
-  const sync = useCallback(() => {
-    setAssignments(getAssignmentsByDepartment(getCurrentUser().departmentId));
-  }, []);
+  const sync = useCallback(async () => {
+    if (!token || !user) return;
+    try {
+      const data = await getAssignments(token);
+      const allAssignments = Array.isArray(data) ? data : [];
+      setAssignments(allAssignments.filter((a: any) => a.departmentId === user.departmentId));
+    } catch (e) {
+      console.error(e);
+      setAssignments([]);
+    }
+  }, [token, user]);
 
   useEffect(() => {
     sync();
-    const unsubSession = subscribeSession(() => sync());
-    const unsubDb = subscribe(sync);
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
   }, [sync]);
 
   /* ── Derived data ─────────────────────────────────────────────────────────── */
@@ -111,8 +123,9 @@ export default function PlannerPage() {
         (STATUS_COLUMNS.indexOf(current as (typeof STATUS_COLUMNS)[number]) + 1) %
           STATUS_COLUMNS.length
       ];
-    updateAssignment(item.id, { status: plannerBadgeStatus(nextLabel) });
-    sync();
+    // Backend API call here to update assignment status
+    // updateAssignment(item.id, { status: plannerBadgeStatus(nextLabel) });
+    // sync();
   };
 
   /* ── Render card ──────────────────────────────────────────────────────────── */

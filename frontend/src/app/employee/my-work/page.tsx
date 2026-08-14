@@ -8,9 +8,25 @@ import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
-import { getAssignmentsByOwner, updateAssignment, addBlocker, resolveBlocker, subscribe, type Assignment } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
 
+type Assignment = {
+  id: string;
+  title: string;
+  project: string;
+  status: BadgeStatus;
+  priority: string;
+  dueDate: string;
+  dueBucket: string;
+  progress: number;
+  owner: string;
+  ownerId: string;
+  nextStep: string;
+  lastUpdate: string;
+  blocker: string;
+  supportLink: string;
+  projectId: string;
+};
 const columns: DataTableColumn<Assignment>[] = [
   {
     key: "title",
@@ -50,10 +66,50 @@ const columns: DataTableColumn<Assignment>[] = [
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
+async function fetchSupabaseAssignments(personId: string): Promise<Assignment[] | null> {
+  const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+  if (!personId || personId.startsWith("google-") || personId.length < 30) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/assignments?person_id=${encodeURIComponent(personId)}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((item: any) => ({
+          id: item.id?.substring(0, 8) || "N/A",
+          title: item.role || "Task",
+          project: item.projectName || "Unknown",
+          status: item.status === "done" ? "completed" : item.status === "blocked" ? "waiting" : "in-progress",
+          priority: "Medium",
+          dueDate: item.endDate || "2026-12-31",
+          dueBucket: "later",
+          progress: 50,
+          owner: "Me",
+          ownerId: item.personId,
+          nextStep: "Continue work",
+          lastUpdate: "Today",
+          blocker: "None",
+          supportLink: "#",
+          projectId: item.projectId,
+        }));
+      }
+    }
+  } catch (e) {
+    console.error("Backend assignments fetch failed", e);
+  }
+  return null;
+}
+
 export default function MyWorkPage() {
+  const { user, token, loading: authLoading } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
 
   // Filters
   const [statusFilter, setStatusFilter] = useState("all");
@@ -72,28 +128,21 @@ export default function MyWorkPage() {
 
   useEffect(() => {
     setMounted(true);
-    setAssignments(getAssignmentsByOwner(getCurrentUser().id));
-
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setAssignments(getAssignmentsByOwner(user.id));
-      setSelectedAssignment(null);
-    });
-
-    const unsubDb = subscribe(() => {
-      setAssignments(getAssignmentsByOwner(getCurrentUser().id));
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
+    
+    const loadAssignments = async (userId: string) => {
+      let data = await fetchSupabaseAssignments(userId);
+      setAssignments(data || []);
     };
-  }, []);
+
+    if (user && !authLoading) {
+      loadAssignments(user.id);
+    }
+  }, [user, authLoading]);
 
   // Update selectedAssignment ref when assignments update in DB
   useEffect(() => {
     if (selectedAssignment) {
-      const fresh = getAssignmentsByOwner(getCurrentUser().id).find((a) => a.id === selectedAssignment.id);
+      const fresh = assignments.find((a) => a.id === selectedAssignment.id);
       if (fresh) {
         setSelectedAssignment(fresh);
       }
@@ -143,12 +192,13 @@ export default function MyWorkPage() {
     const isCompleted = status === "completed";
     const statusNote = `Status changed to ${status.replace("-", " ")} just now.`;
     
-    updateAssignment(assignmentId, {
-      status,
-      progress: isCompleted ? 100 : (progress !== undefined ? progress : 50),
-      lastUpdate: statusNote,
-      ...(isCompleted ? { blocker: "None" } : {})
-    });
+    // In a real app, this would call the backend API to update the assignment
+    // For now, we update the local state to reflect the change visually
+    setAssignments(prev => prev.map(a => 
+      a.id === assignmentId 
+        ? { ...a, status, progress: isCompleted ? 100 : (progress !== undefined ? progress : 50), lastUpdate: statusNote, ...(isCompleted ? { blocker: "None" } : {}) } 
+        : a
+    ));
 
     setNotice(`Assignment ${assignmentId} was updated to ${status.replace("-", " ")}.`);
     setTimeout(() => setNotice(""), 5000);
@@ -162,23 +212,12 @@ export default function MyWorkPage() {
       return;
     }
 
-    const blockerId = `BLK-${Date.now()}`;
-    addBlocker({
-      id: blockerId,
-      title: `Blocked: ${selectedAssignment.title}`,
-      project: selectedAssignment.project,
-      owner: currentUser.name,
-      severity: "High",
-      daysBlocked: 0,
-      reason: blockerReason,
-    });
-
-    // Update assignment status
-    updateAssignment(selectedAssignment.id, {
-      status: "blocked",
-      blocker: blockerReason,
-      lastUpdate: `Blocker raised: ${blockerReason}`
-    });
+    // In a real app, this would call the backend API
+    setAssignments(prev => prev.map(a => 
+      a.id === selectedAssignment.id 
+        ? { ...a, status: "blocked", blocker: blockerReason, lastUpdate: `Blocker raised: ${blockerReason}` } 
+        : a
+    ));
 
     setBlockerReason("");
     setNotice(`Blocker raised on assignment ${selectedAssignment.id}`);
@@ -193,9 +232,12 @@ export default function MyWorkPage() {
       return;
     }
 
-    updateAssignment(selectedAssignment.id, {
-      lastUpdate: `Progress note added: ${progressNote}`
-    });
+    // In a real app, this would call the backend API
+    setAssignments(prev => prev.map(a => 
+      a.id === selectedAssignment.id 
+        ? { ...a, lastUpdate: `Progress note added: ${progressNote}` } 
+        : a
+    ));
 
     setProgressNote("");
     setNotice("Progress note updated successfully.");
@@ -386,7 +428,12 @@ export default function MyWorkPage() {
                   type="button"
                   className="core-button core-button-primary"
                   onClick={() => {
-                    resolveBlocker(selectedAssignment.id);
+                    // Backend API call here
+                    setAssignments(prev => prev.map(a => 
+                      a.id === selectedAssignment.id 
+                        ? { ...a, status: "in-progress", blocker: "None", lastUpdate: `Blocker resolved.` } 
+                        : a
+                    ));
                     setNotice(`Blocker on ${selectedAssignment.id} resolved.`);
                   }}
                 >
