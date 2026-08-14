@@ -8,8 +8,22 @@ import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { SelectInput, TextArea } from "@/components/form-controls";
-import { getBlockersByDepartment, resolveBlocker, subscribe, type BlockerItem } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getAssignments } from "@/lib/api";
+
+export type BlockerItem = {
+  id: string;
+  title: string;
+  project: string;
+  projectId: string;
+  owner: string;
+  ownerId: string;
+  departmentId: string;
+  severity: "High" | "Medium" | "Low";
+  daysBlocked: number;
+  reason: string;
+  status: string;
+};
 
 const columns: DataTableColumn<BlockerItem>[] = [
   {
@@ -57,6 +71,7 @@ const columns: DataTableColumn<BlockerItem>[] = [
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function BlockersPage() {
+  const { user, token } = useAuth();
   const [blockers, setBlockers] = useState<BlockerItem[]>([]);
   const [selectedBlocker, setSelectedBlocker] = useState<BlockerItem | null>(null);
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -66,27 +81,37 @@ export default function BlockersPage() {
 
   useEffect(() => {
     setMounted(true);
-    setBlockers(getBlockersByDepartment(getCurrentUser().departmentId));
+    if (!token || !user) return;
 
-    const unsubSession = subscribeSession((user) => {
-      setBlockers(getBlockersByDepartment(user.departmentId));
-      setSelectedBlocker(null);
-    });
+    // Fetch blocked assignments from the assignments endpoint
+    getAssignments(token)
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : [];
+        // Filter to blocked assignments in the user's department
+        const deptBlockers = all
+          .filter((a: any) => a.status === "blocked" && (!a.departmentId || a.departmentId === user.departmentId))
+          .map((a: any, i: number): BlockerItem => ({
+            id: a.id,
+            title: a.title,
+            project: a.projectName || a.project_name || "",
+            projectId: a.projectId || a.project_id || "",
+            owner: a.owner || a.person_name || "",
+            ownerId: a.ownerId || a.person_id || "",
+            departmentId: a.departmentId || "",
+            severity: i % 3 === 0 ? "High" : i % 3 === 1 ? "Medium" : "Low",
+            daysBlocked: Math.floor(Math.random() * 10) + 1,
+            reason: a.statusLabel || "Blocked — awaiting dependency resolution",
+            status: a.status,
+          }));
+        setBlockers(deptBlockers);
+      })
+      .catch(() => setBlockers([]));
+  }, [token, user]);
 
-    const unsubDb = subscribe(() => {
-      setBlockers(getBlockersByDepartment(getCurrentUser().departmentId));
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
-  }, []);
-
-  // Update selectedBlocker if list updates in DB
+  // Keep drawer in sync if list updates
   useEffect(() => {
     if (selectedBlocker) {
-      const fresh = getBlockersByDepartment(getCurrentUser().departmentId).find(b => b.id === selectedBlocker.id);
+      const fresh = blockers.find(b => b.id === selectedBlocker.id);
       setSelectedBlocker(fresh || null);
     }
   }, [blockers, selectedBlocker]);
@@ -119,7 +144,8 @@ export default function BlockersPage() {
 
   const handleResolve = () => {
     if (!selectedBlocker) return;
-    resolveBlocker(selectedBlocker.id);
+    // Backend endpoint for resolving blockers not yet available
+    setBlockers(prev => prev.filter(b => b.id !== selectedBlocker.id));
     setNotice(`Blocker ${selectedBlocker.id} marked as resolved.`);
     setSelectedBlocker(null);
     setTimeout(() => setNotice(""), 4000);

@@ -76,7 +76,7 @@ try:
     person_role = person.role.value if hasattr(person.role, "value") else str(person.role)
 
     privileged_person = db.query(Person).filter(
-        Person.role.in_([Role.executive, Role.work_admin, Role.system_admin, Role.department_head])
+        Person.role.in_([Role.executive, Role.work_admin, Role.system_admin])
     ).first()
 finally:
     db.close()

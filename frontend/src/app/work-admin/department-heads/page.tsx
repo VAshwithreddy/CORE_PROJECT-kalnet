@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { WorkAdminShell } from "@/components/work-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
-import { StatusBadge } from "@/components/status-badge";
-import { getTeamMembers, subscribe, type TeamMember } from "@/lib/mock-db";
-import { DEMO_USERS } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getSystemUsers, getPeople } from "@/lib/api";
 
 interface DeptHeadRow {
   id: string;
@@ -28,32 +27,46 @@ const columns: DataTableColumn<DeptHeadRow>[] = [
 ];
 
 export default function DepartmentHeadsPage() {
-  const [members, setMembers] = useState<TeamMember[]>([]);
+  const { token } = useAuth();
+  const [deptHeads, setDeptHeads] = useState<DeptHeadRow[]>([]);
   const [selected, setSelected] = useState<DeptHeadRow | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    setMembers(getTeamMembers());
-    return subscribe(() => setMembers(getTeamMembers()));
-  }, []);
-
-  const deptHeads: DeptHeadRow[] = useMemo(() => {
-    return DEMO_USERS
-      .filter((u) => u.role === "department_head")
-      .map((u) => {
-        const teamSize = members.filter((m) => m.departmentId === u.departmentId || !m.departmentId).length;
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [users, people] = await Promise.all([
+        getSystemUsers(token).catch(() => []),
+        getPeople(token).catch(() => [])
+      ]);
+      
+      const heads = (Array.isArray(users) ? users : []).filter((u: any) => u.role === "department" || u.role === "department_head");
+      const allPeople = Array.isArray(people) ? people : [];
+      
+      setDeptHeads(heads.map((u: any): DeptHeadRow => {
+        // Count how many people belong to this department
+        const teamSize = allPeople.filter((p: any) => p.departmentId === u.departmentId || p.departmentName === u.departmentName).length;
+        
         return {
-          id: u.id,
-          name: u.name,
-          department: u.departmentName,
-          roleLabel: u.roleLabel,
+          id: u.id || "",
+          name: u.username || u.name || "",
+          department: u.departmentName || u.department || "",
+          roleLabel: u.roleLabel || u.title || "Department Head",
           teamSize,
           activeProjects: 0,
           loadBand: "healthy",
         };
-      });
-  }, [members]);
+      }));
+    } catch (err) {
+      console.error(err);
+      setDeptHeads([]);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchData();
+  }, [fetchData]);
 
   if (!mounted) return null;
 

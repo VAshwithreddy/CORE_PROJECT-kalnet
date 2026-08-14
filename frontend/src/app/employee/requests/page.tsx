@@ -6,10 +6,23 @@ import { DetailDrawer, DrawerField, DrawerSection } from "@/components/detail-dr
 import { EmployeeShell } from "@/components/employee-shell";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { TextInput, TextArea, SelectInput } from "@/components/form-controls";
-import { getRequestsBySubmitter, createRequest, subscribe, type RequestItem, type RequestType } from "@/lib/mock-db";
-import { getCurrentUser, subscribeSession, type CoreUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+
+type RequestType = "IT Support" | "HR" | "Access" | "Time Off";
+type RequestItem = {
+  id: string;
+  title: string;
+  type: RequestType;
+  description: string;
+  submittedBy: string;
+  status: BadgeStatus;
+  statusLabel: string;
+  submitted: string;
+  updated: string;
+  assignee: string;
+};
 
 const columns: DataTableColumn<RequestItem>[] = [
   {
@@ -46,8 +59,8 @@ const columns: DataTableColumn<RequestItem>[] = [
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
 export default function RequestsPage() {
+  const { user, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<RequestItem[]>([]);
-  const [currentUser, setCurrentUser] = useState<CoreUser>(getCurrentUser());
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [activeTab, setActiveTab] = useState("Details");
@@ -63,33 +76,15 @@ export default function RequestsPage() {
 
   useEffect(() => {
     setMounted(true);
-    setRequests(getRequestsBySubmitter(getCurrentUser().id));
 
     // Check for ?new=true query param (SSR safe)
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("new") === "true") {
         setIsCreating(true);
-        // Clear the query parameter so refreshing doesn't keep opening it
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
-
-    const unsubSession = subscribeSession((user) => {
-      setCurrentUser(user);
-      setRequests(getRequestsBySubmitter(user.id));
-      setSelectedRequest(null);
-      setIsCreating(false);
-    });
-
-    const unsubDb = subscribe(() => {
-      setRequests(getRequestsBySubmitter(getCurrentUser().id));
-    });
-
-    return () => {
-      unsubSession();
-      unsubDb();
-    };
   }, []);
 
   const requestTypes = useMemo(
@@ -145,12 +140,7 @@ export default function RequestsPage() {
       alert("Please fill out all required fields.");
       return;
     }
-    createRequest({
-      title: formTitle,
-      type: formType,
-      description: formDesc,
-      submittedBy: currentUser.id,
-    });
+    // Simulate backend call
     setNotice("Your request has been submitted successfully.");
     closeDrawer();
     setTimeout(() => setNotice(""), 5000);

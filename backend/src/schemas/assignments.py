@@ -22,6 +22,7 @@ class AssignmentResponse(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+    department_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True

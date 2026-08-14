@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { WorkAdminShell } from "@/components/work-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput } from "@/components/form-controls";
-import { getRequests, subscribe, type RequestItem } from "@/lib/mock-db";
+import { useAuth } from "@/lib/auth";
+import { getRequests } from "@/lib/api";
+
+type RequestItem = {
+  id: string;
+  title: string;
+  type: string;
+  submitted: string;
+  status: BadgeStatus;
+  statusLabel: string;
+  assignee: string;
+  description: string;
+  updated: string;
+};
 
 interface RoutingRow extends RequestItem {
   targetDept: string;
@@ -35,15 +48,35 @@ const columns: DataTableColumn<RoutingRow>[] = [
 ];
 
 export default function RoutingPage() {
+  const { token } = useAuth();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [deptFilter, setDeptFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
 
+  const fetchRequests = useCallback(() => {
+    if (!token) return;
+    getRequests(token)
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : [];
+        setRequests(all.map((r: any): RequestItem => ({
+          id: r.id || "",
+          title: r.title || r.reason || "Unknown Request",
+          type: r.type || "General",
+          submitted: r.submitted || r.created_at || new Date().toISOString().split("T")[0],
+          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "waiting",
+          statusLabel: r.status || "Pending",
+          assignee: r.assignee || "Unassigned",
+          description: r.description || "No description provided",
+          updated: r.updated || r.updated_at || new Date().toISOString().split("T")[0],
+        })));
+      })
+      .catch(() => setRequests([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setRequests(getRequests());
-    return subscribe(() => setRequests(getRequests()));
-  }, []);
+    fetchRequests();
+  }, [fetchRequests]);
 
   const rows = useMemo(() => requests.map(inferRouting), [requests]);
 

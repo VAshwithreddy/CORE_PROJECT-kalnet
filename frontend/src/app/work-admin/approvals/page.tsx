@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { WorkAdminShell } from "@/components/work-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { StatusBadge } from "@/components/status-badge";
-import { getRequests, subscribe, type RequestItem, approveRequest, rejectRequest, createAuditEvent } from "@/lib/mock-db";
-import { getCurrentUser } from "@/lib/mock-session";
+import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
+import { useAuth } from "@/lib/auth";
+import { getRequests } from "@/lib/api";
+
+export type RequestItem = {
+  id: string;
+  title: string;
+  type: string;
+  submitted: string;
+  status: BadgeStatus;
+  statusLabel: string;
+};
 
 const columns: DataTableColumn<RequestItem>[] = [
   { key: "id", header: "Request ID", sortable: true },
@@ -23,15 +32,32 @@ const columns: DataTableColumn<RequestItem>[] = [
 ];
 
 export default function ApprovalsPage() {
+  const { user, token } = useAuth();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  const fetchRequests = useCallback(() => {
+    if (!token) return;
+    getRequests(token)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setRequests(list.map((r: any): RequestItem => ({
+          id: r.id || "",
+          title: r.title || "",
+          type: r.type || "IT Support",
+          submitted: r.submitted || r.created_at || "",
+          status: r.status || "waiting",
+          statusLabel: r.statusLabel || "Pending",
+        })));
+      })
+      .catch(() => setRequests([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setRequests(getRequests());
-    return subscribe(() => setRequests(getRequests()));
-  }, []);
+    fetchRequests();
+  }, [fetchRequests]);
 
   const pending = useMemo(() => requests.filter((r) => r.status === "waiting"), [requests]);
   const approved = useMemo(() => requests.filter((r) => r.status === "approved"), [requests]);
@@ -75,33 +101,17 @@ export default function ApprovalsPage() {
           {
             label: "Approve",
             onClick: () => {
-              approveRequest(row.id);
-              createAuditEvent({
-                actor: getCurrentUser().name,
-                role: getCurrentUser().role,
-                action: "Approved Request",
-                target: row.id,
-                outcome: "approved",
-                outcomeLabel: "Approved",
-              });
-              setNotice(`Request ${row.id} approved.`);
-              setTimeout(() => setNotice(""), 3000);
+              setRequests(prev => prev.map(r => r.id === row.id ? { ...r, status: "approved", statusLabel: "Approved" } : r));
+              setNotice(`Request ${row.id} approved (Simulated, backend write requires approval API).`);
+              setTimeout(() => setNotice(""), 4000);
             },
           },
           {
             label: "Reject",
             onClick: () => {
-              rejectRequest(row.id);
-              createAuditEvent({
-                actor: getCurrentUser().name,
-                role: getCurrentUser().role,
-                action: "Rejected Request",
-                target: row.id,
-                outcome: "rejected",
-                outcomeLabel: "Rejected",
-              });
-              setNotice(`Request ${row.id} rejected.`);
-              setTimeout(() => setNotice(""), 3000);
+              setRequests(prev => prev.map(r => r.id === row.id ? { ...r, status: "rejected", statusLabel: "Rejected" } : r));
+              setNotice(`Request ${row.id} rejected (Simulated, backend write requires approval API).`);
+              setTimeout(() => setNotice(""), 4000);
             },
             danger: true,
           },

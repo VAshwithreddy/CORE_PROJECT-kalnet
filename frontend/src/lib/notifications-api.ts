@@ -12,7 +12,35 @@
  */
 import { apiClient } from "./api-client";
 import { getAuthToken } from "./auth-token";
-import type { NotificationItem, NotificationType } from "./mock-db";
+export type NotificationType =
+  | "Security"
+  | "System"
+  | "HR"
+  | "Assignment"
+  | "Completion"
+  | "Deadline"
+  | "Overdue"
+  | "Blocker"
+  | "Priority"
+  | "Escalation"
+  | "Stale"
+  | "General"
+  | (string & {});
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  status: BadgeStatus;
+  statusLabel: string;
+  date: string;
+  isRead: boolean;
+  actionRequired: boolean;
+  recipientId?: string;
+  actionUrl?: string;
+}
+
 import type { BadgeStatus } from "@/components/status-badge";
 
 export type NotificationSeverity = "info" | "warning" | "critical";

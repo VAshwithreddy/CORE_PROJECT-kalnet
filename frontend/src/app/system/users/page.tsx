@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { SystemAdminShell } from "@/components/system-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
 import { StatusBadge } from "@/components/status-badge";
-import { getSystemUsers, subscribe, updateSystemUserStatus, createAuditEvent, type SystemUser } from "@/lib/mock-db";
-import { getCurrentUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getSystemUsers } from "@/lib/api";
+
+export type SystemUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  roleLabel: string;
+  departmentName: string;
+  status: "approved" | "blocked";
+  lastLogin: string;
+};
 
 const columns: DataTableColumn<SystemUser>[] = [
   { key: "id", header: "User ID", sortable: true },
@@ -31,17 +42,36 @@ const columns: DataTableColumn<SystemUser>[] = [
 ];
 
 export default function SystemUsersPage() {
+  const { user, token } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<SystemUser | null>(null);
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  const fetchUsers = useCallback(() => {
+    if (!token) return;
+    getSystemUsers(token)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setUsers(list.map((u: any): SystemUser => ({
+          id: u.id || "",
+          name: u.username || u.name || "",
+          email: u.email || "",
+          role: u.role || "employee",
+          roleLabel: u.roleLabel || u.title || "Member",
+          departmentName: u.departmentName || u.department || "General",
+          status: u.is_active !== false ? "approved" : "blocked",
+          lastLogin: u.last_login || u.lastLogin || "—",
+        })));
+      })
+      .catch(() => setUsers([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setUsers(getSystemUsers());
-    return subscribe(() => setUsers(getSystemUsers()));
-  }, []);
+    fetchUsers();
+  }, [fetchUsers]);
 
   const filtered = useMemo(
     () =>
@@ -109,17 +139,9 @@ export default function SystemUsersPage() {
             label: row.status === "approved" ? "Suspend User" : "Reactivate User",
             onClick: () => {
               const newStatus = row.status === "approved" ? "blocked" : "approved";
-              updateSystemUserStatus(row.id, newStatus);
-              createAuditEvent({
-                actor: getCurrentUser().name,
-                role: getCurrentUser().role,
-                action: row.status === "approved" ? "Suspended User" : "Reactivated User",
-                target: `${row.id} (${row.name})`,
-                outcome: newStatus === "approved" ? "approved" : "blocked",
-                outcomeLabel: newStatus === "approved" ? "Reactivated" : "Suspended",
-              });
-              setNotice(`${row.name}'s status has been updated.`);
-              setTimeout(() => setNotice(""), 3000);
+              setUsers(prev => prev.map(u => u.id === row.id ? { ...u, status: newStatus } : u));
+              setNotice(`${row.name}'s status has been updated (Simulated, backend write requires higher admin scope).`);
+              setTimeout(() => setNotice(""), 4000);
             },
             danger: row.status === "approved",
           },

@@ -1,14 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { WorkAdminShell } from "@/components/work-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput } from "@/components/form-controls";
-import { getRequests, subscribe, type RequestItem, routeRequest, createAuditEvent } from "@/lib/mock-db";
-import { getCurrentUser } from "@/lib/mock-session";
+import { useAuth } from "@/lib/auth";
+import { getRequests } from "@/lib/api";
+
+export type RequestItem = {
+  id: string;
+  title: string;
+  type: string;
+  submitted: string;
+  status: BadgeStatus;
+  statusLabel: string;
+  assignee: string;
+  description: string;
+  updated: string;
+};
 
 const columns: DataTableColumn<RequestItem>[] = [
   { key: "id", header: "Request ID", sortable: true },
@@ -35,17 +47,37 @@ const columns: DataTableColumn<RequestItem>[] = [
 ];
 
 export default function IntakePage() {
+  const { user, token } = useAuth();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [selected, setSelected] = useState<RequestItem | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  const fetchRequests = useCallback(() => {
+    if (!token) return;
+    getRequests(token)
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : [];
+        setRequests(all.map((r: any): RequestItem => ({
+          id: r.id || "",
+          title: r.title || r.reason || "Unknown Request",
+          type: r.type || "General",
+          submitted: r.submitted || r.created_at || new Date().toISOString().split("T")[0],
+          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "waiting",
+          statusLabel: r.status || "Pending",
+          assignee: r.assignee || "Unassigned",
+          description: r.description || "No description provided",
+          updated: r.updated || r.updated_at || new Date().toISOString().split("T")[0],
+        })));
+      })
+      .catch(() => setRequests([]));
+  }, [token]);
+
   useEffect(() => {
     setMounted(true);
-    setRequests(getRequests());
-    return subscribe(() => setRequests(getRequests()));
-  }, []);
+    fetchRequests();
+  }, [fetchRequests]);
 
   const filtered = useMemo(
     () => requests.filter((r) => typeFilter === "all" || r.type === typeFilter),
@@ -98,16 +130,8 @@ export default function IntakePage() {
             label: "Route to Default Dept",
             onClick: () => {
               const targetDept = row.type === "IT Support" || row.type === "Access" ? "IT Operations" : row.type === "Time Off" ? "People Ops" : "HR";
-              routeRequest(row.id, targetDept);
-              createAuditEvent({
-                actor: getCurrentUser().name,
-                role: getCurrentUser().role,
-                action: "Routed Request",
-                target: `${row.id} to ${targetDept}`,
-                outcome: "in-progress",
-                outcomeLabel: "Routed",
-              });
-              setNotice(`${row.id} routed to ${targetDept}.`);
+              // Simulated route action
+              setNotice(`${row.id} routed to ${targetDept} (Simulated).`);
               setTimeout(() => setNotice(""), 3000);
             }
           }
