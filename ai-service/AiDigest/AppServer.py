@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.tools import tool
 import pandas as pd
 from getdata import get_engine
@@ -11,6 +13,22 @@ from langchain_core.messages import BaseMessage
 from dotenv import load_dotenv
 from sqlalchemy import text
 import os
+from pydantic import BaseModel
+
+app=FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_methods="*",
+    allow_headers="*",
+    allow_credentials=False,
+    allow_origins="*"
+    )
+
+
+
+
+
 engine=get_engine()
 load_dotenv()
 api_key=os.getenv("api_key") 
@@ -70,66 +88,6 @@ graph.add_conditional_edges(
 graph.add_edge("tools", "chatbot")
 
 agent=graph.compile()
-
-
-
-# system = """
-# You are an experienced Project Management Analyst.
-
-# Whenever you need project progress information, call the get_sql_data tool.
-
-# The tool returns status update records for project assignments.
-
-# After receiving the data, generate a professional project status report.
-
-# Your report should include:
-
-# # Executive Summary
-# - Overall health of the projects.
-# - Number of updates received.
-# - General progress.
-
-# # Status Breakdown
-# - Count of assignments that are:
-#   - On Track
-#   - Blocked
-#   - At Risk (if present)
-#   - Completed (if present)
-#   - Any other statuses
-
-# # Key Achievements
-# - Summarize important completed work from the progress notes.
-# - Group similar accomplishments together instead of repeating identical updates.
-
-# # Blockers and Risks
-# - Identify all blockers.
-# - Highlight recurring blockers affecting multiple assignments.
-# - Explain the potential impact on delivery.
-
-# # Progress Trends
-# - Identify patterns across updates.
-# - Mention repeated progress notes, duplicate updates, or lack of progress if observed.
-
-# # Recommendations
-# Provide practical recommendations such as:
-# - Escalate recurring blockers.
-# - Follow up with teams awaiting dependencies.
-# - Prioritize critical blocked assignments.
-# - Improve reporting consistency if duplicate updates exist.
-
-# # Overall Assessment
-# Conclude with an overall assessment of project health.
-
-# Guidelines:
-# - Use clear Markdown headings.
-# - Be concise but informative.
-# - Do not expose SQL queries.
-# - Base conclusions only on the provided data.
-# - Do not invent information that is not present.
-# - If data is missing, explicitly mention it.
-# """
-
-
 system = """
 You are a Senior Project Management Analyst.
 
@@ -211,13 +169,30 @@ Guidelines:
 - Do not invent missing information.
 - Never expose SQL queries.
 """
-result = agent.invoke({
-    "messages": [
-        SystemMessage(content=system),
-        HumanMessage(content="Generate a status report")
-    ]
-})
+# result = agent.invoke({
+#     "messages": [
+#         SystemMessage(content=system),
+#         HumanMessage(content="Generate a status report")
+#     ]
+# })
 
-print(result["messages"][-1].content)
+# print(result["messages"][-1].content)
 
 
+
+
+
+
+
+
+@app.get("/AiDigest")
+def getDigest():
+    result=agent.invoke({
+        "messages":[
+            SystemMessage(content=system),
+            HumanMessage(content="Generate s status report")
+        ]
+    })
+    print(result["messages"][-1].content)
+
+    return {"Report":result["messages"][-1].content}
