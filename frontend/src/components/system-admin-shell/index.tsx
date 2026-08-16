@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
+import { useUnreadNotifications } from "@/components/notifications/use-unread-notifications";
 
 interface SystemAdminShellProps {
   children: ReactNode;
@@ -18,6 +19,8 @@ export function SystemAdminShell({
   breadcrumbs,
   topbarActions,
 }: SystemAdminShellProps) {
+  const { unreadCount: notificationCount } = useUnreadNotifications(1);
+
   const navItems: NavItem[] = [
     { label: "Users", href: "/system/users", icon: <Icon name="users" /> },
     { label: "Roles", href: "/system/roles", icon: <Icon name="shield" /> },
@@ -25,6 +28,7 @@ export function SystemAdminShell({
     { label: "Service Accounts", href: "/system/service-accounts", icon: <Icon name="monitor" /> },
     { label: "Audit", href: "/system/audit", icon: <Icon name="report" /> },
     { label: "Settings", href: "/system/settings", icon: <Icon name="settings" /> },
+    { label: "Notifications", href: "/system/notifications", icon: <Icon name="bell" />, badge: notificationCount > 0 ? notificationCount : undefined },
   ];
 
   return (

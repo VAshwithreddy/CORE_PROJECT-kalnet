@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
 import { useAuth } from "@/lib/auth";
+import { useUnreadNotifications } from "@/components/notifications/use-unread-notifications";
 
 interface EmployeeShellProps {
   children: ReactNode;
@@ -21,12 +22,11 @@ export function EmployeeShell({
 }: EmployeeShellProps) {
   const { user } = useAuth();
   const [assignmentCount, setAssignmentCount] = useState(0);
-  const [notificationCount, setNotificationCount] = useState(0);
+  const { unreadCount: notificationCount } = useUnreadNotifications(1);
 
   useEffect(() => {
-    // Backend integration will populate these counts
+    // Backend integration will populate this count
     setAssignmentCount(0);
-    setNotificationCount(0);
   }, [user]);
 
   const navItems: NavItem[] = [
