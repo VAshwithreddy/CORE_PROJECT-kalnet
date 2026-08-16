@@ -49,7 +49,7 @@ function withoutId(set: Set<string>, id: string): Set<string> {
 }
 
 export function NotificationInbox({ breadcrumbRootLabel, breadcrumbRootHref }: NotificationInboxProps) {
-  const { token } = useAuth(); console.log("[NOTIFICATIONS AUTH]", { hasToken: Boolean(token), tokenLength: token?.length });
+  const { token } = useAuth();
   const [tab, setTab] = useState<Tab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10); // mirrors DataTable's own default page size
