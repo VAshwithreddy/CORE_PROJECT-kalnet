@@ -11,7 +11,6 @@
  * DataTable/StatusBadge UI can render real data without a redesign.
  */
 import { apiClient } from "./api-client";
-import { getAuthToken } from "./auth-token";
 export type NotificationType =
   | "Security"
   | "System"
@@ -83,18 +82,19 @@ export interface NotificationListResponse {
   offset: number;
 }
 
-/** True once a real backend session exists — see auth-token.ts for why
- * this can currently be false for every user of this prototype. */
-export function hasRealSession(): boolean {
-  return Boolean(getAuthToken());
+/** True once the caller has a real backend session token. `token` is
+ * whatever useAuth() currently returns — this function does not read
+ * any token store itself. */
+export function hasRealSession(token: string | null | undefined): boolean {
+  return Boolean(token);
 }
 
 export async function fetchNotifications(
+  token: string | null | undefined,
   unreadOnly = false,
   pagination?: { limit?: number; offset?: number }
 ): Promise<NotificationListResponse> {
-  const token = getAuthToken();
-  if (!token) throw new Error("No real backend session — see auth-token.ts");
+  if (!token) throw new Error("Not signed in.");
   const params = new URLSearchParams();
   if (unreadOnly) params.set("unread_only", "true");
   if (pagination?.limit !== undefined) params.set("limit", String(pagination.limit));
@@ -103,28 +103,39 @@ export async function fetchNotifications(
   return apiClient<NotificationListResponse>(`/api/v1/notifications${qs ? `?${qs}` : ""}`, { token });
 }
 
-export async function markNotificationRead(id: string): Promise<ApiNotification> {
-  const token = getAuthToken();
-  if (!token) throw new Error("No real backend session — see auth-token.ts");
+export async function markNotificationRead(token: string | null | undefined, id: string): Promise<ApiNotification> {
+  if (!token) throw new Error("Not signed in.");
   return apiClient<ApiNotification>(`/api/v1/notifications/${id}/read`, {
     method: "POST",
     token,
   });
 }
 
-export async function markAllNotificationsReadReal(): Promise<{ updated_count: number }> {
-  const token = getAuthToken();
-  if (!token) throw new Error("No real backend session — see auth-token.ts");
+export async function markAllNotificationsReadReal(token: string | null | undefined): Promise<{ updated_count: number }> {
+  if (!token) throw new Error("Not signed in.");
   return apiClient<{ updated_count: number }>(`/api/v1/notifications/read-all`, {
     method: "POST",
     token,
   });
 }
 
-export async function acknowledgeNotification(id: string): Promise<ApiNotification> {
-  const token = getAuthToken();
-  if (!token) throw new Error("No real backend session — see auth-token.ts");
+export async function acknowledgeNotification(token: string | null | undefined, id: string): Promise<ApiNotification> {
+  if (!token) throw new Error("Not signed in.");
   return apiClient<ApiNotification>(`/api/v1/notifications/${id}/acknowledge`, {
+    method: "POST",
+    token,
+  });
+}
+
+/** Best-effort AI enrichment for one of the caller's own notifications.
+ * Per the backend contract this always returns 200 with the notification —
+ * AI disabled/unavailable/low-value output just means `enrichment` stays
+ * null, it is never an error response. Callers should treat a null
+ * `enrichment` on the response as "no AI insight available" rather than
+ * a failure. */
+export async function enrichNotification(token: string | null | undefined, id: string): Promise<ApiNotification> {
+  if (!token) throw new Error("Not signed in.");
+  return apiClient<ApiNotification>(`/api/v1/notifications/${id}/enrich`, {
     method: "POST",
     token,
   });
