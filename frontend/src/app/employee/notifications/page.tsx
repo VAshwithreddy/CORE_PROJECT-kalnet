@@ -71,7 +71,17 @@ export default function NotificationsPage() {
     if (user && token) {
       getNotifications(token)
         .then((data) => {
-          setNotifications(Array.isArray(data) ? data : []);
+          const items = Array.isArray(data) ? data : (data?.items ?? []);
+          setNotifications(items.map((n: any) => ({
+            id: n.id,
+            type: n.severity === "critical" ? "alert" : n.severity === "warning" ? "warning" : "info",
+            title: n.type ? n.type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Notification",
+            message: n.message,
+            isRead: Boolean(n.is_read),
+            timestamp: n.created_at ? new Date(n.created_at).toLocaleString() : "",
+            actionUrl: n.action_url ?? undefined,
+            actionRequired: Boolean(n.requires_acknowledgement) && !n.acknowledged_at,
+          })));
         })
         .catch((err) => {
           console.error("Failed to load notifications:", err);
@@ -227,3 +237,6 @@ export default function NotificationsPage() {
     </EmployeeShell>
   );
 }
+
+
+
