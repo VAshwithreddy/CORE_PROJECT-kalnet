@@ -39,3 +39,16 @@ export const ROLE_HOME_PATHS: Record<string, string> = {
   team_leader: "/employee/home",
 };
 
+export const ROLE_NOTIFICATIONS_PATHS: Record<string, string> = {
+  employee: "/employee/notifications",
+  department_head: "/department/notifications",
+  department: "/department/notifications",
+  executive: "/executive/notifications",
+  work_admin: "/work-admin/notifications",
+  "work-admin": "/work-admin/notifications",
+  system_admin: "/system/notifications",
+  "system-admin": "/system/notifications",
+  system: "/system/notifications",
+  manager: "/employee/notifications",
+  team_leader: "/employee/notifications",
+};
