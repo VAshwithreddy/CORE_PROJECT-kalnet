@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
 import { useAuth } from "@/lib/auth";
+import { useUnreadNotifications } from "@/components/notifications/use-unread-notifications";
 
 interface WorkAdminShellProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ export function WorkAdminShell({
 }: WorkAdminShellProps) {
   const { user } = useAuth();
   const [intakeBadge, setIntakeBadge] = useState(0);
+  const { unreadCount: notificationCount } = useUnreadNotifications(1);
 
   useEffect(() => {
     // Backend API integration to count pending requests
@@ -35,6 +37,7 @@ export function WorkAdminShell({
     { label: "Approvals", href: "/work-admin/approvals", icon: <Icon name="check" /> },
     { label: "Escalations", href: "/work-admin/escalations", icon: <Icon name="alert" />, badgeType: "danger" as const },
     { label: "Audit", href: "/work-admin/audit", icon: <Icon name="report" /> },
+    { label: "Notifications", href: "/work-admin/notifications", icon: <Icon name="bell" />, badge: notificationCount > 0 ? notificationCount : undefined },
   ];
 
 

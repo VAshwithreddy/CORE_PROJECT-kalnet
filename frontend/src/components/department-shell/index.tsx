@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
 import { useAuth } from "@/lib/auth";
+import { useUnreadNotifications } from "@/components/notifications/use-unread-notifications";
 
 interface DepartmentShellProps {
   children: ReactNode;
@@ -22,6 +23,7 @@ export function DepartmentShell({
   departmentName,
 }: DepartmentShellProps) {
   const { user } = useAuth();
+  const { unreadCount: notificationCount } = useUnreadNotifications(1);
 
   const effectiveDepartmentName = departmentName || user?.departmentName || "Loading...";
 
@@ -33,6 +35,7 @@ export function DepartmentShell({
     { label: "Planner", href: "/department/planner", icon: <Icon name="calendar" /> },
     { label: "Blockers", href: "/department/blockers", icon: <Icon name="alert" />, badge: 2, badgeType: "danger" },
     { label: "Digest", href: "/department/digest", icon: <Icon name="chart" /> },
+    { label: "Notifications", href: "/department/notifications", icon: <Icon name="bell" />, badge: notificationCount > 0 ? notificationCount : undefined },
   ];
 
   return (
