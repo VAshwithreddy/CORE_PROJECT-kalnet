@@ -17,6 +17,10 @@ from src.schemas.projects import (
     ProjectUpdate,
 )
 
+from src.services.notifications import (
+    NotificationService,
+    NotificationRulesEngine,
+)
 
 from datetime import datetime
 import uuid
@@ -267,6 +271,8 @@ class ProjectsService:
             
             project.owner_id = owner.id
 
+        previous_priority = project.priority
+
         for key in ["name", "priority", "status"]:
             if key in update_data and update_data[key] is not None:
                 setattr(project, key, update_data[key])
@@ -289,5 +295,14 @@ class ProjectsService:
                 status_code=400,
                 detail=str(e),
             )
+
+        # Best-effort — see NotificationService.notify(): failures here are
+        # logged and never break the already-successful project update.
+        NotificationService.notify(
+            db,
+            NotificationRulesEngine.on_project_priority_changed,
+            project,
+            previous_priority,
+        )
 
         return _to_response(project, db)
