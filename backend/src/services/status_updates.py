@@ -8,6 +8,11 @@ from src.models.assignment import Assignment
 from src.models.person import Person
 from uuid import UUID
 
+from src.services.notifications import (
+    NotificationService,
+    NotificationRulesEngine,
+)
+
 
 class StatusUpdatesService:
     """
@@ -78,6 +83,18 @@ class StatusUpdatesService:
 
         status_str = data.status.value if hasattr(data.status, "value") else str(data.status)
 
+        # Capture the assignment's previous StatusUpdate.status (not
+        # Assignment.status, which is a separate field this method never
+        # touches) so the rules engine can detect blocked/unblocked
+        # transitions — see NotificationRulesEngine.on_status_update_created.
+        previous_update = (
+            db.query(StatusUpdate)
+            .filter(StatusUpdate.assignment_id == assignment.id)
+            .order_by(StatusUpdate.created_at.desc())
+            .first()
+        )
+        previous_status = previous_update.status if previous_update else None
+
         new_update = StatusUpdate(
             assignment_id=assignment.id,
             author_id=author.id,
@@ -96,5 +113,15 @@ class StatusUpdatesService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Database error while creating status update: {str(e.orig) if hasattr(e, 'orig') else str(e)}"
             )
+
+        # Best-effort — see NotificationService.notify(): failures here are
+        # logged and never break the already-successful status update.
+        NotificationService.notify(
+            db,
+            NotificationRulesEngine.on_status_update_created,
+            assignment,
+            new_update,
+            previous_status,
+        )
 
         return StatusUpdatesService._to_response(new_update, db)
