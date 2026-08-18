@@ -24,5 +24,6 @@ def get_data(engine,query):
 
 
 
-result=get_data(get_engine(),"""select * from status_updates""")
-print(result)
+if __name__ == "__main__":
+    result=get_data(get_engine(),"""select * from status_updates""")
+    print(result)
