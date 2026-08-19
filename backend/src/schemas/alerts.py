@@ -12,6 +12,8 @@ class AlertResponse(BaseModel):
     title: str = Field(..., description="Short title of the alert", example="Assignment Stale: Authentication Module")
     description: str = Field(..., description="Detailed description of the alert", example="No status update has been posted in the last 7 days.")
     assignment_id: Optional[UUID] = Field(None, description="Optional associated assignment ID")
+    days_since_update: int = Field(..., ge=0, description="Number of days since the assignment received an update")
+    severity: str = Field(..., description="Alert severity")
     created_at: datetime = Field(..., description="Timestamp of when the alert was generated", example="2026-07-10T08:00:00Z")
     is_dismissed: bool = Field(..., description="Whether the alert has been dismissed by the user", example=False)
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerField, DrawerSection } from "@/components/detail-drawer";
 import { EmployeeShell } from "@/components/employee-shell";
@@ -16,6 +16,7 @@ type Assignment = {
   project: string;
   status: BadgeStatus;
   priority: string;
+  assignedDate: string;
   dueDate: string;
   dueBucket: string;
   progress: number;
@@ -49,6 +50,7 @@ const columns: DataTableColumn<Assignment>[] = [
     render: (row) => <StatusBadge status={row.status} size="sm" />,
   },
   { key: "priority", header: "Priority", sortable: true },
+  { key: "assignedDate", header: "Assigned", sortable: true, minWidth: "140px" },
   { key: "dueDate", header: "Due", sortable: true, minWidth: "140px" },
   {
     key: "progress",
@@ -66,6 +68,19 @@ const columns: DataTableColumn<Assignment>[] = [
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
+function getDueBucket(dueDate: string): string {
+  const due = new Date(`${dueDate}T12:00:00`);
+  if (Number.isNaN(due.getTime())) return "later";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(today);
+  weekEnd.setDate(today.getDate() + 7);
+  if (due < today) return "overdue";
+  if (due.toDateString() === today.toDateString()) return "today";
+  if (due <= weekEnd) return "week";
+  return "later";
+}
+
 async function fetchSupabaseAssignments(personId: string): Promise<Assignment[] | null> {
   const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
   if (!personId || personId.startsWith("google-") || personId.length < 30) {
@@ -82,13 +97,14 @@ async function fetchSupabaseAssignments(personId: string): Promise<Assignment[] 
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data.map((item: any) => ({
-          id: item.id?.substring(0, 8) || "N/A",
+          id: item.id || "N/A",
           title: item.role || "Task",
           project: item.projectName || "Unknown",
-          status: item.status === "done" ? "completed" : item.status === "blocked" ? "waiting" : "in-progress",
+          status: item.status === "done" || item.status === "completed" ? "completed" : item.status === "blocked" ? "blocked" : item.status === "waiting" ? "waiting" : "in-progress",
           priority: "Medium",
-          dueDate: item.endDate || "2026-12-31",
-          dueBucket: "later",
+          assignedDate: item.startDate || "Not set",
+          dueDate: item.endDate || "Not set",
+          dueBucket: getDueBucket(item.endDate || ""),
           progress: 50,
           owner: "Me",
           ownerId: item.personId,
@@ -125,9 +141,15 @@ export default function MyWorkPage() {
   const [progressNote, setProgressNote] = useState("");
   const [notice, setNotice] = useState("1 blocked assignment needs attention before the end of today.");
   const [mounted, setMounted] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [requestedAssignmentId, setRequestedAssignmentId] = useState("");
+  const handledDeepLink = useRef(false);
 
   useEffect(() => {
     setMounted(true);
+    const params = new URLSearchParams(window.location.search);
+    setFocusMode(params.get("focus") === "active");
+    setRequestedAssignmentId(params.get("assignment") || "");
     
     const loadAssignments = async (userId: string) => {
       let data = await fetchSupabaseAssignments(userId);
@@ -138,6 +160,19 @@ export default function MyWorkPage() {
       loadAssignments(user.id);
     }
   }, [user, authLoading]);
+
+  useEffect(() => {
+    if (!requestedAssignmentId || handledDeepLink.current || assignments.length === 0) return;
+    const assignment = assignments.find((item) => item.id === requestedAssignmentId);
+    if (assignment) {
+      setSelectedAssignment(assignment);
+      setActiveTab("Details");
+      setNotice(`Opened ${assignment.title} from your calendar deadline.`);
+    } else {
+      setNotice("That assignment is no longer available in your work list.");
+    }
+    handledDeepLink.current = true;
+  }, [assignments, requestedAssignmentId]);
 
   // Update selectedAssignment ref when assignments update in DB
   useEffect(() => {
@@ -155,15 +190,18 @@ export default function MyWorkPage() {
   );
 
   const filteredAssignments = useMemo(
-    () =>
-      assignments.filter((assignment) => {
+    () => {
+      const result = assignments.filter((assignment) => {
         const matchesStatus = statusFilter === "all" || assignment.status === statusFilter;
         const matchesPriority = priorityFilter === "all" || assignment.priority === priorityFilter;
         const matchesDue = dueFilter === "all" || assignment.dueBucket === dueFilter;
         const matchesProject = projectFilter === "all" || assignment.project === projectFilter;
-        return matchesStatus && matchesPriority && matchesDue && matchesProject;
-      }),
-    [assignments, dueFilter, priorityFilter, projectFilter, statusFilter],
+        const matchesFocus = !focusMode || assignment.status !== "completed";
+        return matchesStatus && matchesPriority && matchesDue && matchesProject && matchesFocus;
+      });
+      return focusMode ? [...result].sort((left, right) => left.dueDate.localeCompare(right.dueDate)) : result;
+    },
+    [assignments, dueFilter, focusMode, priorityFilter, projectFilter, statusFilter],
   );
 
   const metrics = useMemo(
@@ -291,6 +329,12 @@ export default function MyWorkPage() {
       {notice && (
         <div className="alert-strip alert-strip--warning" role="status">
           <span>{notice}</span>
+        </div>
+      )}
+
+      {focusMode && (
+        <div className="alert-strip alert-strip--info" role="status">
+          <span>Focus session active: completed work is hidden and open assignments are ordered by due date.</span>
         </div>
       )}
 
@@ -465,6 +509,7 @@ export default function MyWorkPage() {
             <DrawerSection title="Assignment Details">
               <DrawerField label="Project" value={selectedAssignment.project} />
               <DrawerField label="Priority" value={selectedAssignment.priority} />
+              <DrawerField label="Assignment Date" value={selectedAssignment.assignedDate} />
               <DrawerField label="Due Date" value={selectedAssignment.dueDate} />
               <DrawerField label="Owner" value={selectedAssignment.owner} />
             </DrawerSection>

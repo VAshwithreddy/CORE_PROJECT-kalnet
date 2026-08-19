@@ -127,8 +127,14 @@ useEffect(() => {
         throw new Error(data.error);
       }
 
-      // Replace the old fake report with the real API report
-      setBriefingText(data.Report || "");
+      // Extract text content whether Report is an array of blocks, an object, or a string
+      const reportText = Array.isArray(data.Report)
+        ? data.Report.map((item: any) => item?.text || (typeof item === "string" ? item : "")).join("\n")
+        : typeof data.Report === "string"
+        ? data.Report
+        : data.Report?.text || "";
+
+      setBriefingText(reportText);
 
       setHasGenerated(true);
     } catch (err) {

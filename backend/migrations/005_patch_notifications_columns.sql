@@ -18,7 +18,12 @@ ALTER TABLE notifications
 ALTER TABLE notifications
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
--- 5. Drop the DEFAULT constraint on title after adding the column
+-- 5. Track when a notification was read. The API and ORM have always
+-- expected this field, so older databases need it before notification reads.
+ALTER TABLE notifications
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+
+-- 6. Drop the DEFAULT constraint on title after adding the column
 --    (keeps existing rows intact, new rows must supply a title)
 ALTER TABLE notifications
   ALTER COLUMN title DROP DEFAULT;

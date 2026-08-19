@@ -23,8 +23,14 @@ export async function apiClient<TResponse>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `API request failed with status ${response.status}`);
+    const payload = await response.json().catch(() => null);
+    const detail = typeof payload?.detail === "string" ? payload.detail : "";
+    // Backend exceptions can contain SQL implementation details. Keep those
+    // useful in server logs but never display them to an employee.
+    const message = /database error|sqlalchemy|psycopg|undefinedcolumn/i.test(detail)
+      ? "The service is temporarily unavailable. Please try again."
+      : detail || `API request failed with status ${response.status}`;
+    throw new Error(message);
   }
 
   return response.json() as Promise<TResponse>;

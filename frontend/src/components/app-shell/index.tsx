@@ -326,19 +326,6 @@ export function AppShell({
             {breadcrumbs}
           </div>
 
-          <button
-            type="button"
-            className="app-shell__search-trigger"
-            aria-label="Search command palette"
-          >
-            <Icon name="search" size={16} />
-            {" "}
-            Search CORE...
-            <span className="app-shell__search-kbd">
-              Ctrl K
-            </span>
-          </button>
-
           {/* Notifications */}
           <NotificationBell />
 

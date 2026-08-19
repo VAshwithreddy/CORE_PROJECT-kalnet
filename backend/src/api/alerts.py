@@ -14,17 +14,20 @@ router = APIRouter()
     "/stale",
     response_model=List[AlertResponse],
     status_code=status.HTTP_200_OK,
-    tags=["alerts"],
-    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
+    tags=["alerts"]
 )
 def get_stale_alerts(
-    db: Session = Depends(get_rls_db_for(get_current_user))
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> List[AlertResponse]:
     """
-    Retrieve a list of stale alerts.
-    These are assignments that haven't received a status update in a defined period (e.g., 7 days).
+    Retrieve stale alerts visible to the signed-in user. Employees receive
+    their own alerts; privileged roles retain the organisation-wide view.
     """
-    return AlertsService.get_stale_alerts(db)
+    return AlertsService.get_stale_alerts(
+        db,
+        person_id=None if current_user.role in PRIVILEGED_ROLES else current_user.person_id,
+    )
 
 @router.get(
     "/{id}",

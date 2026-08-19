@@ -60,7 +60,12 @@ class MeService:
             last_name=last_name,
             department=dept_name,
             title=title,
-            bio=None,
+            bio=person.bio,
+            preferred_name=person.preferred_name,
+            pronouns=person.pronouns,
+            mobile_phone=person.mobile_phone,
+            personal_email=person.personal_email,
+            time_zone=person.time_zone,
         )
 
     @staticmethod
@@ -94,6 +99,10 @@ class MeService:
         if "skills" in update_data and update_data["skills"] is not None:
             person.skills = update_data["skills"]
 
+        for field in ("preferred_name", "pronouns", "mobile_phone", "personal_email", "bio", "time_zone"):
+            if field in update_data:
+                setattr(person, field, update_data[field] or None)
+
         try:
             db.commit()
             db.refresh(person)
@@ -120,7 +129,12 @@ class MeService:
             last_name=last_name,
             department=dept_name,
             title=title,
-            bio=None,
+            bio=person.bio,
+            preferred_name=person.preferred_name,
+            pronouns=person.pronouns,
+            mobile_phone=person.mobile_phone,
+            personal_email=person.personal_email,
+            time_zone=person.time_zone,
         )
 
 

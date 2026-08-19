@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.models.assignment import Assignment
 from src.models.staleness_alert import StalenessAlert
 from src.schemas.alerts import AlertResponse, AlertUpdate
 from src.services.notifications import NotificationService, NotificationRulesEngine
@@ -13,15 +14,14 @@ class AlertsService:
     """Business logic for the Alerts module."""
 
     @staticmethod
-    def get_stale_alerts(db: Session) -> List[AlertResponse]:
+    def get_stale_alerts(db: Session, person_id: UUID | None = None) -> List[AlertResponse]:
         """
         Retrieve a list of active (non-dismissed) stale alerts.
         """
-        alerts = (
-            db.query(StalenessAlert)
-            .filter(StalenessAlert.status == "open")
-            .all()
-        )
+        query = db.query(StalenessAlert).filter(StalenessAlert.status == "open")
+        if person_id:
+            query = query.join(Assignment).filter(Assignment.person_id == person_id)
+        alerts = query.order_by(StalenessAlert.created_at.desc()).all()
 
         return [AlertResponse.model_validate(alert) for alert in alerts]
 

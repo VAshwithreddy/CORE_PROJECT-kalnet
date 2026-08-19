@@ -1,7 +1,7 @@
 import uuid
 import enum
 
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 
@@ -21,6 +21,12 @@ class Person(Base):
     role = Column(Enum(Role), nullable=False)
     availability = Column(Enum(Availability), nullable=False, default=Availability.available)
     skills = Column(ARRAY(String), nullable=True)
+    preferred_name = Column(String, nullable=True)
+    pronouns = Column(String, nullable=True)
+    mobile_phone = Column(String, nullable=True)
+    personal_email = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
+    time_zone = Column(String, nullable=True)
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True)
     manager_id = Column(UUID(as_uuid=True), ForeignKey("people.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default="now()", nullable=False)

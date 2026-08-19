@@ -194,5 +194,6 @@ def getDigest():
         ]
     })
     print(result["messages"][-1].content)
+    report=result["messages"][-1].content
 
-    return {"Report":result["messages"][-1].content}
+    return {"Report":report}

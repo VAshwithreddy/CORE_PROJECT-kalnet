@@ -17,7 +17,7 @@
  *   FormErrorSummary – top-of-form error list
  */
 
-import { useId, type ChangeEvent, type ReactNode } from "react";
+import { useId, type ChangeEvent, type FocusEvent, type ReactNode } from "react";
 
 // ─── TextInput ───────────────────────────────────────────────────────────────
 
@@ -35,6 +35,7 @@ interface TextInputProps {
   readOnly?: boolean;
   autoComplete?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: FocusEvent<HTMLInputElement>) => void;
   className?: string;
 }
 
@@ -52,6 +53,7 @@ export function TextInput({
   readOnly,
   autoComplete,
   onChange,
+  onBlur,
   className = "",
 }: TextInputProps) {
   const generatedId = useId();
@@ -91,6 +93,7 @@ export function TextInput({
         aria-invalid={error ? "true" : undefined}
         aria-required={required}
         onChange={onChange}
+        onBlur={onBlur}
       />
 
       {error && (
@@ -117,6 +120,7 @@ interface TextAreaProps {
   rows?: number;
   maxLength?: number;
   onChange?: (e: ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur?: (e: FocusEvent<HTMLTextAreaElement>) => void;
   className?: string;
 }
 
@@ -133,6 +137,7 @@ export function TextArea({
   rows = 4,
   maxLength,
   onChange,
+  onBlur,
   className = "",
 }: TextAreaProps) {
   const generatedId = useId();
@@ -171,6 +176,7 @@ export function TextArea({
         aria-invalid={error ? "true" : undefined}
         aria-required={required}
         onChange={onChange}
+        onBlur={onBlur}
       />
 
       {error && (
