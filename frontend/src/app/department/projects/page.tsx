@@ -10,7 +10,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { TextInput, SelectInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getProjects, getPeople } from "@/lib/api";
+import { getProjects, getPeople, createProject } from "@/lib/api";
 
 export type ProjectHealth = "On Track" | "At Risk" | "Off Track" | "Delivered";
 
@@ -35,6 +35,34 @@ const healthStatusMap: Record<ProjectHealth, BadgeStatus> = {
   "Off Track": "blocked",
   "Delivered": "completed",
 };
+
+function parseDueDate(dueStr: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) {
+    return dueStr;
+  }
+  // If it contains Q1/Q2/Q3/Q4
+  if (dueStr.includes("Q4")) {
+    const yearMatch = dueStr.match(/\d{4}/);
+    const year = yearMatch ? yearMatch[0] : new Date().getFullYear();
+    return `${year}-12-31`;
+  }
+  if (dueStr.includes("Q3")) {
+    const yearMatch = dueStr.match(/\d{4}/);
+    const year = yearMatch ? yearMatch[0] : new Date().getFullYear();
+    return `${year}-09-30`;
+  }
+  if (dueStr.includes("Q2")) {
+    const yearMatch = dueStr.match(/\d{4}/);
+    const year = yearMatch ? yearMatch[0] : new Date().getFullYear();
+    return `${year}-06-30`;
+  }
+  if (dueStr.includes("Q1")) {
+    const yearMatch = dueStr.match(/\d{4}/);
+    const year = yearMatch ? yearMatch[0] : new Date().getFullYear();
+    return `${year}-03-31`;
+  }
+  return `${new Date().getFullYear()}-12-31`;
+}
 
 const columns: DataTableColumn<ProjectItem>[] = [
   {
@@ -117,12 +145,22 @@ export default function ProjectsPage() {
       getPeople(token).catch(() => []),
     ]).then(([projData, teamData]) => {
       const allProjects = Array.isArray(projData) ? projData : [];
-      // Filter projects by department
-      setProjects(allProjects.filter((p: any) => p.departmentId === user.departmentId));
+      // Filter projects by department (API returns snake_case department_id)
+      setProjects(allProjects.filter((p: any) => {
+        const pDept = p.department_id || p.departmentId;
+        return !pDept || String(pDept) === String(user.departmentId);
+      }));
 
       const team = Array.isArray(teamData) ? teamData : [];
-      const deptTeam = team.filter((m: any) => !m.departmentId || m.departmentId === user.departmentId);
-      setTeamMembers(deptTeam.map((m: any) => ({ value: m.id, label: m.name })));
+      // Use String() on both sides so UUID objects compare correctly;
+      // if nobody matches the dept filter, show everyone the API returned
+      // (backend RBAC already restricts visibility).
+      const deptTeam = team.filter((m: any) => {
+        const mDept = m.department_id || m.departmentId;
+        return !mDept || String(mDept) === String(user.departmentId);
+      });
+      const members = deptTeam.length > 0 ? deptTeam : team;
+      setTeamMembers(members.map((m: any) => ({ value: m.id, label: m.full_name || m.name })));
     });
 
     if (typeof window !== "undefined") {
@@ -185,14 +223,34 @@ export default function ProjectsPage() {
       return;
     }
 
-    const ownerName = teamMembers.find(m => m.value === formOwner)?.label || formOwner;
+    const formattedDate = parseDueDate(formDueDate);
 
-    // Backend integration for creating project goes here
-    // createProject({ ... });
-
-    setNotice("Project created successfully.");
-    closeDrawer();
-    setTimeout(() => setNotice(""), 5000);
+    createProject(
+      {
+        name: formName,
+        department_id: user?.departmentId,
+        owner_id: formOwner,
+        due_date: formattedDate,
+        priority: formHealth === "Off Track" ? "high" : formHealth === "At Risk" ? "medium" : "low",
+        status: formStatus,
+      },
+      token || undefined
+    )
+      .then(() => getProjects(token || undefined))
+      .then((projData) => {
+        const allProjects = Array.isArray(projData) ? projData : [];
+        setProjects(allProjects.filter((p: any) => {
+          const pDept = p.department_id || p.departmentId;
+          return !pDept || String(pDept) === String(user?.departmentId);
+        }));
+        setNotice("Project created successfully.");
+        closeDrawer();
+        setTimeout(() => setNotice(""), 5000);
+      })
+      .catch((err) => {
+        console.error("Failed to create project:", err);
+        alert(`Error creating project: ${err.message}`);
+      });
   };
 
   if (!mounted) {

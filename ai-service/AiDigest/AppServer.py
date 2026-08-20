@@ -19,10 +19,10 @@ app=FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_methods="*",
-    allow_headers="*",
+    allow_methods=["*"],
+    allow_headers=["*"],
     allow_credentials=False,
-    allow_origins="*"
+    allow_origins=["*"]
     )
 
 
@@ -31,10 +31,12 @@ app.add_middleware(
 
 engine=get_engine()
 load_dotenv()
-api_key=os.getenv("api_key") 
+api_key=os.getenv("api_key") or os.getenv("GEMINI_API_KEY") 
+
+llm=ChatGoogleGenerativeAI(model="gemini-2.0-flash",google_api_key=api_key,temperature=0.7)
 
 
-llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash",google_api_key=api_key,temperature=0.7)
+
 
 @tool
 def get_sql_data():
@@ -43,11 +45,13 @@ def get_sql_data():
     Use this tool whenever you need the latest employee status information
     to generate reports or perform analysis.
     """
-    with engine.connect() as conn:
+    eng = get_engine()
+    with eng.connect() as conn:
         print("Fetching data.....")
         df=pd.read_sql(text("select * from status_updates"),conn)
         print(df)
         return df.to_dict(orient="records")
+
 
 llm_with_tools=llm.bind_tools([get_sql_data])
 

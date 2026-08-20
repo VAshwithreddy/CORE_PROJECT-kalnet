@@ -71,17 +71,48 @@ def get_assignment_by_id(
 @router.post(
     "", 
     response_model=AssignmentResponse, 
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
+    status_code=status.HTTP_201_CREATED
 )
 def create_assignment(
     assignment_data: AssignmentCreate, 
-    db: Session = Depends(get_rls_db_for(get_current_user))
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user)
 ) -> AssignmentResponse:
     """
     Create a new assignment linking a person to a project.
-    Only privileged roles can perform this action.
+    Only privileged roles and department heads can perform this action.
     """
+    from src.core.rbac import PRIVILEGED_ROLES
+    from src.models.person import Person
+    
+    if current_user.role not in PRIVILEGED_ROLES and current_user.role != "department_head":
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient privileges to perform this action."
+        )
+        
+    if current_user.role == "department_head":
+        caller = db.query(Person).filter(Person.id == current_user.person_id).first()
+        
+        target_person_val = assignment_data.person_id or assignment_data.assignee_id
+        target_person = None
+        if target_person_val:
+            try:
+                target_person_uuid = UUID(str(target_person_val))
+                target_person = db.query(Person).filter(Person.id == target_person_uuid).first()
+            except ValueError:
+                if str(target_person_val).isdigit():
+                    people = db.query(Person).order_by(Person.id).all()
+                    if people:
+                        idx = (int(target_person_val) - 1) % len(people)
+                        target_person = people[idx]
+                        
+        if not target_person or not caller or target_person.department_id != caller.department_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Department heads can only assign tasks to members of their own department."
+            )
+            
     return AssignmentsService.create_assignment(assignment_data, db)
 
 

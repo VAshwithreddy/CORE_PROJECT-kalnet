@@ -77,8 +77,63 @@ export function getDigests(token?: string) {
   return apiRequest("/digests/weekly", token);
 }
 
-export function getProjects(token?: string) {
-  return apiRequest("/projects", token);
+export async function getProjects(token?: string) {
+  const res = await apiRequest("/projects", token);
+  return Array.isArray(res)
+    ? res.map((p: any) => {
+        let feStatus = "new";
+        if (p.status === "active") {
+          feStatus = "in-progress";
+        } else if (p.status === "planned") {
+          feStatus = "waiting";
+        } else if (p.status === "completed") {
+          feStatus = "completed";
+        } else if (p.status === "on_hold") {
+          feStatus = "blocked";
+        } else if (p.status === "cancelled") {
+          feStatus = "archived";
+        } else {
+          feStatus = p.status || "new";
+        }
+
+        return {
+          ...p,
+          departmentId: p.department_id || p.departmentId || "",
+          ownerId: p.owner_id || p.ownerId || "",
+          owner: p.owner_name || p.owner || "Unassigned",
+          status: feStatus,
+          statusLabel: (p.status || "new").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          health: p.priority === "high" ? "At Risk" : p.priority === "critical" ? "Off Track" : p.status === "completed" ? "Delivered" : "On Track",
+          dueDate: p.target_date || p.due_date || p.dueDate || "",
+          progress: p.status === "completed" || p.status === "done" ? 100 : p.status === "in_progress" || p.status === "active" ? 50 : 10,
+          nextMilestone: p.metadata?.next_milestone || "",
+          blockers: p.metadata?.blockers || 0,
+        };
+      })
+    : [];
+}
+
+export function createProject(
+  body: { name: string; department_id?: string; owner_id?: string; due_date?: string; priority?: string; status?: string },
+  token?: string
+) {
+  let dbStatus = "planned";
+  if (body.status === "in-progress" || body.status === "active") {
+    dbStatus = "active";
+  } else if (body.status === "completed") {
+    dbStatus = "completed";
+  } else if (body.status === "blocked" || body.status === "on_hold") {
+    dbStatus = "on_hold";
+  } else if (body.status === "archived" || body.status === "cancelled") {
+    dbStatus = "cancelled";
+  } else {
+    dbStatus = "planned";
+  }
+  const mappedBody = { ...body, status: dbStatus };
+  return apiRequest("/projects", token, {
+    method: "POST",
+    body: mappedBody,
+  });
 }
 
 export function getDepartments(token?: string) {
@@ -115,4 +170,40 @@ export function markNotificationsRead(ids: string[], token?: string) {
 
 export function getPersonAssignments(personId: string, token?: string) {
   return apiRequest(`/auth/assignments?person_id=${personId}`, token);
+}
+
+export function getStatusUpdates(assignmentId: string, token?: string) {
+  return apiRequest(`/assignments/${assignmentId}/status-updates`, token);
+}
+
+export function createStatusUpdate(
+  assignmentId: string,
+  body: { author_id: string; status: string; message: string; blockers?: string },
+  token?: string
+) {
+  return apiRequest(`/assignments/${assignmentId}/status-updates`, token, {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateAssignment(
+  assignmentId: string,
+  body: { status?: string; role?: string; allocation_percent?: number; person_id?: string },
+  token?: string
+) {
+  return apiRequest(`/assignments/${assignmentId}`, token, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function createAssignment(
+  body: { person_id: string; project_id: string; role?: string; status?: string; start_date?: string; end_date?: string },
+  token?: string
+) {
+  return apiRequest("/assignments", token, {
+    method: "POST",
+    body,
+  });
 }

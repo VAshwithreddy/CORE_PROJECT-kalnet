@@ -8,9 +8,10 @@ CONN_STRING=os.getenv("DATABASE_URL")
 
 def get_engine():
     try:
-        return create_engine(CONN_STRING)
+        return create_engine(CONN_STRING, pool_pre_ping=True, pool_recycle=300)
     except Exception as e:
         print("engine exception : ",e)
+
 
 
 def get_data(engine,query):

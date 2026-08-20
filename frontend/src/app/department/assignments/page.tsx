@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput, TextInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getAssignments, getProjects, getPeople } from "@/lib/api";
+import { getAssignments, getProjects, getPeople, createAssignment, updateAssignment } from "@/lib/api";
 
 type Assignment = {
   id: string;
@@ -87,13 +87,29 @@ export default function AssignmentsPage() {
       getPeople(token).catch(() => []),
     ]).then(([aData, pData, tData]) => {
       const all = Array.isArray(aData) ? aData : [];
-      setAssignments(all.filter((a: any) => !a.departmentId || a.departmentId === deptId));
+      setAssignments(all.filter((a: any) => {
+        const aDept = a.department_id || a.departmentId;
+        return !aDept || String(aDept) === String(deptId);
+      }));
 
       const allP = Array.isArray(pData) ? pData : [];
-      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.name || p.id, label: p.name })));
+      const deptProjects = allP.filter((p: any) => {
+        const pDept = p.department_id || p.departmentId;
+        return !pDept || String(pDept) === String(deptId);
+      });
+      // Fall back to all returned projects if dept filter drops everything
+      const finalProjects = deptProjects.length > 0 ? deptProjects : allP;
+      setProjects(finalProjects.map((p: any) => ({ value: p.id, label: p.name })));
 
       const allT = Array.isArray(tData) ? tData : [];
-      setTeamMembers(allT.filter((m: any) => !m.departmentId || m.departmentId === deptId).map((m: any) => ({ value: m.id, label: m.name })));
+      const deptMembers = allT.filter((m: any) => {
+        const mDept = m.department_id || m.departmentId;
+        return !mDept || String(mDept) === String(deptId);
+      });
+      // Fall back to all returned people if dept filter drops everyone
+      // (backend RBAC already limits what is returned)
+      const finalMembers = deptMembers.length > 0 ? deptMembers : allT;
+      setTeamMembers(finalMembers.map((m: any) => ({ value: m.id, label: m.full_name || m.name })));
     });
   }, [token, user]);
 
@@ -141,9 +157,26 @@ export default function AssignmentsPage() {
   const handleReassign = (newOwnerId: string) => {
     if (!selectedAssignment) return;
     const ownerName = teamMembers.find(m => m.value === newOwnerId)?.label || "Unknown";
-    // Backend PATCH /api/v1/assignments/{id} — would need privileged role
-    setNotice(`Reassignment to ${ownerName} queued. Backend update requires manager role.`);
-    setTimeout(() => setNotice(""), 4000);
+
+    updateAssignment(
+      selectedAssignment.id,
+      { person_id: newOwnerId },
+      token || undefined
+    )
+      .then(() => getAssignments(token || undefined))
+      .then((aData) => {
+        const all = Array.isArray(aData) ? aData : [];
+        setAssignments(all.filter((a: any) => {
+          const aDept = a.department_id || a.departmentId;
+          return !aDept || String(aDept) === String(user?.departmentId);
+        }));
+        setNotice(`Reassigned successfully to ${ownerName}.`);
+        setTimeout(() => setNotice(""), 4000);
+      })
+      .catch((err) => {
+        console.error("Failed to reassign assignment:", err);
+        alert(`Error reassigning task: ${err.message}`);
+      });
   };
 
   const handleCreateTask = () => {
@@ -151,10 +184,31 @@ export default function AssignmentsPage() {
       alert("Please fill in all required fields.");
       return;
     }
-    const ownerName = teamMembers.find(m => m.value === newTaskOwner)?.label || newTaskOwner;
-    // Backend POST /api/v1/assignments — requires privileged role
-    setNotice(`Assignment "${newTaskTitle}" creation queued. Backend requires manager role.`);
-    setTimeout(() => setNotice(""), 4000);
+
+    createAssignment(
+      {
+        person_id: newTaskOwner,
+        project_id: newTaskProject,
+        role: newTaskTitle,
+        status: "on_track",
+      },
+      token || undefined
+    )
+      .then(() => getAssignments(token || undefined))
+      .then((aData) => {
+        const all = Array.isArray(aData) ? aData : [];
+        setAssignments(all.filter((a: any) => {
+          const aDept = a.department_id || a.departmentId;
+          return !aDept || String(aDept) === String(user?.departmentId);
+        }));
+        setNotice(`Assignment "${newTaskTitle}" created successfully.`);
+        setTimeout(() => setNotice(""), 4000);
+      })
+      .catch((err) => {
+        console.error("Failed to create assignment:", err);
+        alert(`Error creating task: ${err.message}`);
+      });
+
     setIsNewTaskOpen(false);
     setNewTaskTitle("");
     setNewTaskProject("");

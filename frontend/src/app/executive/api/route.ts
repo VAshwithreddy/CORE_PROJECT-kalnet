@@ -1,19 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import path from "path";
 import { getExecutiveDemoData } from "./demo-data";
 
 type ExecutiveAction = "overview" | "departments" | "portfolio" | "risks" | "digests" | "reports";
 const LIVE_QUERY_TIMEOUT_MS = 4500;
 
+import fs from "fs";
+
+let cachedPythonCommand: string | null = null;
+
 function getPythonCommand() {
+  if (cachedPythonCommand) {
+    return cachedPythonCommand;
+  }
+
   if (process.env.PYTHON_BIN) {
-    return process.env.PYTHON_BIN;
+    cachedPythonCommand = process.env.PYTHON_BIN;
+    return cachedPythonCommand;
   }
+
+  // Auto-detect backend virtual environment python (has psycopg2)
+  const venvCandidates = [
+    path.join(process.cwd(), "..", "backend", ".venv", "Scripts", "python.exe"),
+    path.join(process.cwd(), "..", "backend", ".venv", "bin", "python"),
+  ];
+  for (const venvPython of venvCandidates) {
+    if (fs.existsSync(venvPython)) {
+      cachedPythonCommand = `"${venvPython}"`;
+      console.log("[Executive API] Using venv python:", venvPython);
+      return cachedPythonCommand;
+    }
+  }
+
   if (process.platform === "win32") {
-    return "py -3";
+    try {
+      execSync("py -3 --version", { stdio: "ignore" });
+      cachedPythonCommand = "py -3";
+    } catch {
+      try {
+        execSync("python --version", { stdio: "ignore" });
+        cachedPythonCommand = "python";
+      } catch {
+        cachedPythonCommand = "python";
+      }
+    }
+  } else {
+    try {
+      execSync("python3 --version", { stdio: "ignore" });
+      cachedPythonCommand = "python3";
+    } catch {
+      try {
+        execSync("python --version", { stdio: "ignore" });
+        cachedPythonCommand = "python";
+      } catch {
+        cachedPythonCommand = "python3";
+      }
+    }
   }
-  return "python3";
+
+  return cachedPythonCommand;
 }
 
 export async function GET(req: NextRequest) {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithPopup, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword } from "firebase/auth";
-import { auth as firebaseAuth } from "@/lib/firebase";
+import { auth as firebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { ROLE_HOME_PATHS } from "@/lib/roles";
 import { useAuth, type AuthUser } from "@/lib/auth";
 
@@ -77,7 +77,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user, loading: authLoading, error: authError, logout } = useAuth();
+  const { user, loading: authLoading, error: authError, logout, loginDirect } = useAuth();
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const isExecutingOAuthRef = useRef(false);
@@ -141,8 +141,14 @@ function LoginForm() {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("active_login_attempt", "true");
       }
-      await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
-      // Wait for useAuth effect / onAuthStateChanged to handle redirect and profile loading
+
+      if (isFirebaseConfigured && firebaseAuth) {
+        // Firebase path: authenticate via Firebase, then onAuthStateChanged handles the rest
+        await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
+      } else {
+        // Direct backend path: authenticate directly against FastAPI backend
+        await loginDirect(email.trim().toLowerCase(), password);
+      }
     } catch (err: any) {
       console.error(err);
       if (typeof window !== "undefined") {
@@ -159,6 +165,10 @@ function LoginForm() {
 
 
   const handleGoogleSignInClick = async () => {
+    if (!isFirebaseConfigured || !firebaseAuth) {
+      setError("Google Sign-In requires Firebase configuration. Please set NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file.");
+      return;
+    }
     if (isExecutingOAuthRef.current || loading || authLoading) return;
     isExecutingOAuthRef.current = true;
     setLoading(true);

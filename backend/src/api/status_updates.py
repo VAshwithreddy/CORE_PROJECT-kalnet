@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 from src.core.database import get_db, get_rls_db_for
 from src.core.dependencies import get_current_user, CurrentUser
 from src.core.rbac import RBACService
@@ -9,6 +10,24 @@ from src.models.assignment import Assignment
 from uuid import UUID
 
 router = APIRouter()
+
+
+@router.get(
+    "/{assignment_id}/status-updates",
+    response_model=List[StatusUpdateResponse],
+    tags=["status updates"]
+)
+def list_status_updates(
+    assignment_id: str,
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user)
+) -> List[StatusUpdateResponse]:
+    """
+    List all status updates for a specific assignment.
+    Returns updates ordered by created_at descending (newest first).
+    """
+    return StatusUpdatesService.get_status_updates(assignment_id, db)
+
 
 
 @router.post(

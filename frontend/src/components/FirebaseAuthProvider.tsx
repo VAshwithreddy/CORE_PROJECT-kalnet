@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 
 export default function FirebaseAuthProvider({ children }: { children: React.ReactNode }) {
@@ -10,6 +10,8 @@ export default function FirebaseAuthProvider({ children }: { children: React.Rea
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       const authProvider = typeof window !== 'undefined' ? localStorage.getItem("auth_provider") : null;
       

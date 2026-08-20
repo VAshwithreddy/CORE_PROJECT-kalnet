@@ -80,7 +80,7 @@ export interface LoginResult {
  * person. See docs/NOTIFICATION_INTELLIGENCE_ARCHITECTURE.md.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
   try {
     const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: "POST",

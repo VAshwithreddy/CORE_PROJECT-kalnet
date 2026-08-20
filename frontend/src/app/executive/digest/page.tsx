@@ -113,7 +113,7 @@ useEffect(() => {
     setError(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/AiDigest");
+      const res = await fetch("http://127.0.0.1:8002/AiDigest");
 
       if (!res.ok) {
         throw new Error("Failed to generate weekly digest");

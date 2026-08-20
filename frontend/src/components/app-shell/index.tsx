@@ -6,8 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { canAccessRoute } from "@/lib/route-policy";
 import { Icon } from "@/components/core-icons";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export interface NavItem {

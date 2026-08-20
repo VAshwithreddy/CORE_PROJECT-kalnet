@@ -9,9 +9,11 @@ import { PageHeader } from "@/components/page-header";
 import { ProgressBar } from "@/components/progress-bar";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { useAuth } from "@/lib/auth";
+import { createStatusUpdate, updateAssignment } from "@/lib/api";
 
 type Assignment = {
   id: string;
+  fullId: string;
   title: string;
   project: string;
   status: BadgeStatus;
@@ -83,9 +85,10 @@ async function fetchSupabaseAssignments(personId: string): Promise<Assignment[] 
       if (Array.isArray(data) && data.length > 0) {
         return data.map((item: any) => ({
           id: item.id?.substring(0, 8) || "N/A",
+          fullId: item.id || "",
           title: item.role || "Task",
           project: item.projectName || "Unknown",
-          status: item.status === "done" ? "completed" : item.status === "blocked" ? "waiting" : "in-progress",
+          status: item.status === "done" ? "completed" : (item.status === "blocked" || item.status === "paused") ? "blocked" : "in-progress",
           priority: "Medium",
           dueDate: item.endDate || "2026-12-31",
           dueBucket: "later",
@@ -188,12 +191,35 @@ export default function MyWorkPage() {
     [assignments],
   );
 
-  const handleUpdateStatus = (assignmentId: string, status: BadgeStatus, progress?: number) => {
+  const handleUpdateStatus = async (assignmentId: string, status: BadgeStatus, progress?: number) => {
     const isCompleted = status === "completed";
     const statusNote = `Status changed to ${status.replace("-", " ")} just now.`;
+    const assignment = assignments.find(a => a.id === assignmentId);
     
-    // In a real app, this would call the backend API to update the assignment
-    // For now, we update the local state to reflect the change visually
+    // Map frontend BadgeStatus to backend Assignment status: "on_track" | "blocked" | "done"
+    const assignmentBackendStatus = status === "completed" ? "done" : status === "blocked" ? "blocked" : "on_track";
+    // Map frontend BadgeStatus to backend StatusUpdate status: "on_track" | "at_risk" | "blocked" | "completed"
+    const updateBackendStatus = status === "in-progress" ? "on_track" : status === "waiting" ? "at_risk" : status === "completed" ? "completed" : "blocked";
+
+    if (assignment?.fullId && user) {
+      try {
+        // 1. Create a status update entry in DB
+        await createStatusUpdate(assignment.fullId, {
+          author_id: user.id,
+          status: updateBackendStatus,
+          message: statusNote,
+          blockers: status === "blocked" ? "Blocked" : undefined,
+        }, token || undefined);
+        
+        // 2. Update the assignment's status in the database
+        await updateAssignment(assignment.fullId, {
+          status: assignmentBackendStatus
+        }, token || undefined);
+      } catch (err) {
+        console.error("Failed to update status in backend:", err);
+      }
+    }
+
     setAssignments(prev => prev.map(a => 
       a.id === assignmentId 
         ? { ...a, status, progress: isCompleted ? 100 : (progress !== undefined ? progress : 50), lastUpdate: statusNote, ...(isCompleted ? { blocker: "None" } : {}) } 
@@ -204,7 +230,7 @@ export default function MyWorkPage() {
     setTimeout(() => setNotice(""), 5000);
   };
 
-  const handleRaiseBlocker = (e: React.FormEvent) => {
+  const handleRaiseBlocker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAssignment) return;
     if (!blockerReason.trim()) {
@@ -212,10 +238,28 @@ export default function MyWorkPage() {
       return;
     }
 
-    // In a real app, this would call the backend API
+    if (selectedAssignment.fullId && user) {
+      try {
+        // 1. Create blocked status update
+        await createStatusUpdate(selectedAssignment.fullId, {
+          author_id: user.id,
+          status: "blocked",
+          message: `Blocker raised: ${blockerReason}`,
+          blockers: blockerReason,
+        }, token || undefined);
+        
+        // 2. Set assignment status to blocked in database
+        await updateAssignment(selectedAssignment.fullId, {
+          status: "blocked"
+        }, token || undefined);
+      } catch (err) {
+        console.error("Failed to create blocker status update:", err);
+      }
+    }
+
     setAssignments(prev => prev.map(a => 
       a.id === selectedAssignment.id 
-        ? { ...a, status: "blocked", blocker: blockerReason, lastUpdate: `Blocker raised: ${blockerReason}` } 
+        ? { ...a, status: "blocked" as BadgeStatus, blocker: blockerReason, lastUpdate: `Blocker raised: ${blockerReason}` } 
         : a
     ));
 
@@ -224,7 +268,7 @@ export default function MyWorkPage() {
     setTimeout(() => setNotice(""), 5000);
   };
 
-  const handleSaveProgressNote = (e: React.FormEvent) => {
+  const handleSaveProgressNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAssignment) return;
     if (!progressNote.trim()) {
@@ -232,7 +276,18 @@ export default function MyWorkPage() {
       return;
     }
 
-    // In a real app, this would call the backend API
+    if (selectedAssignment.fullId && user) {
+      try {
+        await createStatusUpdate(selectedAssignment.fullId, {
+          author_id: user.id,
+          status: "on_track",
+          message: progressNote,
+        }, token || undefined);
+      } catch (err) {
+        console.error("Failed to create progress note:", err);
+      }
+    }
+
     setAssignments(prev => prev.map(a => 
       a.id === selectedAssignment.id 
         ? { ...a, lastUpdate: `Progress note added: ${progressNote}` } 
@@ -427,8 +482,25 @@ export default function MyWorkPage() {
                 <button
                   type="button"
                   className="core-button core-button-primary"
-                  onClick={() => {
-                    // Backend API call here
+                  onClick={async () => {
+                    if (selectedAssignment.fullId && user) {
+                      try {
+                        // 1. Create a status update resolving the blocker
+                        await createStatusUpdate(selectedAssignment.fullId, {
+                          author_id: user.id,
+                          status: "on_track",
+                          message: "Blocker resolved.",
+                        }, token || undefined);
+                        
+                        // 2. Set assignment status to active (on_track) in database
+                        await updateAssignment(selectedAssignment.fullId, {
+                          status: "on_track"
+                        }, token || undefined);
+                      } catch (err) {
+                        console.error("Failed to resolve blocker in backend:", err);
+                      }
+                    }
+                    
                     setAssignments(prev => prev.map(a => 
                       a.id === selectedAssignment.id 
                         ? { ...a, status: "in-progress", blocker: "None", lastUpdate: `Blocker resolved.` } 

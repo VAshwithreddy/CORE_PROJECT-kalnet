@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from "firebase/auth";
-import { auth as firebaseAuth } from "./firebase";
+import { auth as firebaseAuth, isFirebaseConfigured } from "./firebase";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "") + "/api/v1";
 
@@ -24,6 +24,8 @@ export type AuthContextType = {
   loading: boolean;
   error: string | null;
   logout: () => Promise<void>;
+  /** Direct backend login — works without Firebase */
+  loginDirect: (email: string, password: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,7 +35,70 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   error: null,
   logout: async () => {},
+  loginDirect: async () => {},
 });
+
+/**
+ * Fetches user profile from the backend by email and obtains a JWT.
+ * Shared by both Firebase-triggered auth and direct backend auth.
+ */
+async function resolveBackendProfile(email: string) {
+  // Step 1: Look up existing employee record via FastAPI backend
+  let lookupRes: Response;
+  try {
+    lookupRes = await fetch(
+      `${API_URL}/auth/lookup?email=${encodeURIComponent(email)}`
+    );
+  } catch (fetchErr: any) {
+    throw new Error(`Unable to connect to backend server at ${API_URL}. Please ensure the FastAPI backend is running.`);
+  }
+
+  if (!lookupRes.ok) {
+    const errData = await lookupRes.json().catch(() => ({}));
+    throw new Error(errData.detail || `User not found (${lookupRes.status}). Your account is not linked to an employee record.`);
+  }
+
+  const profile = await lookupRes.json();
+
+  // Step 2: Get a signed backend JWT via /auth/login
+  let access_token: string | null = null;
+  try {
+    const loginRes = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: email, password: "firebase_auth_passed" }),
+    });
+    if (loginRes.ok) {
+      const tokenData = await loginRes.json();
+      access_token = tokenData.access_token;
+      if (typeof window !== "undefined" && access_token) {
+        localStorage.setItem("core_access_token", access_token);
+      }
+    }
+  } catch (err) {
+    console.warn("Login token fetch failed:", err);
+  }
+
+  // Step 3: Build user object from the backend profile
+  const user: AuthUser = {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    role: profile.role,
+    roleLabel: profile.roleLabel || "Member",
+    departmentId: profile.departmentId || "dept-general",
+    departmentName: profile.departmentName || "General",
+    initials: profile.initials || profile.name?.[0]?.toUpperCase() || "U",
+  };
+
+  // Step 4: Set role cookie for Next.js middleware RBAC
+  if (typeof window !== "undefined") {
+    document.cookie = `core_session_role=${profile.role}; path=/; max-age=604800; SameSite=Lax`;
+    sessionStorage.removeItem("active_login_attempt");
+  }
+
+  return { user, access_token };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -42,70 +107,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Firebase auth listener (only when Firebase is configured) ──
   useEffect(() => {
+    if (!isFirebaseConfigured || !firebaseAuth) {
+      // No Firebase — check if we have a saved session from direct login
+      if (typeof window !== "undefined") {
+        const savedProfile = localStorage.getItem("core_user_profile");
+        const savedToken = localStorage.getItem("core_access_token");
+        if (savedProfile && savedToken) {
+          try {
+            setUser(JSON.parse(savedProfile));
+            setToken(savedToken);
+          } catch {
+            // corrupted data, ignore
+          }
+        }
+      }
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser && fbUser.email) {
-
         try {
-          // Step 1: Look up existing employee record in Supabase via FastAPI backend
-          let lookupRes: Response;
-          try {
-            lookupRes = await fetch(
-              `${API_URL}/auth/lookup?email=${encodeURIComponent(fbUser.email)}`
-            );
-          } catch (fetchErr: any) {
-            throw new Error(`Unable to connect to backend server at ${API_URL}. Please ensure the FastAPI backend is running.`);
-          }
-
-          if (!lookupRes.ok) {
-            const errData = await lookupRes.json().catch(() => ({}));
-            throw new Error(errData.detail || `User not found (${lookupRes.status}). Your Firebase account is not linked to an employee record.`);
-          }
-
-          const profile = await lookupRes.json();
-
-          // Step 2: Get a signed backend JWT via /auth/login
-          let loginRes: Response | null = null;
-          try {
-            loginRes = await fetch(`${API_URL}/auth/login`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username: fbUser.email, password: "firebase_auth_passed" }),
-            });
-          } catch (err) {
-            console.warn("Login token fetch failed:", err);
-          }
-
-          let access_token: string | null = null;
-          if (loginRes && loginRes.ok) {
-            const tokenData = await loginRes.json();
-            access_token = tokenData.access_token;
-            if (typeof window !== "undefined" && access_token) {
-              localStorage.setItem("core_access_token", access_token);
-            }
-          }
-
-          // Step 3: Populate user state from the backend profile
-          setUser({
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            roleLabel: profile.roleLabel || "Member",
-            departmentId: profile.departmentId || "dept-general",
-            departmentName: profile.departmentName || "General",
-            initials: profile.initials || profile.name?.[0]?.toUpperCase() || "U",
-          });
-
-          setToken(access_token);
-
-          // Step 4: Set role cookie for Next.js middleware RBAC
-          if (typeof window !== "undefined") {
-            document.cookie = `core_session_role=${profile.role}; path=/; max-age=604800; SameSite=Lax`;
-            sessionStorage.removeItem("active_login_attempt");
-          }
-
+          const result = await resolveBackendProfile(fbUser.email);
+          setUser(result.user);
+          setToken(result.access_token);
           setError(null);
         } catch (err: any) {
           console.warn("Auth check failed:", err.message || err);
@@ -133,8 +161,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const logout = async () => {
-    await firebaseSignOut(firebaseAuth);
+  // ── Direct backend login (no Firebase needed) ──
+  const loginDirect = useCallback(async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await resolveBackendProfile(email);
+      setUser(result.user);
+      setToken(result.access_token);
+      // Persist profile for page reloads when Firebase isn't available
+      if (typeof window !== "undefined") {
+        localStorage.setItem("core_user_profile", JSON.stringify(result.user));
+      }
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Login failed.");
+      setUser(null);
+      setToken(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    if (isFirebaseConfigured && firebaseAuth) {
+      try {
+        await firebaseSignOut(firebaseAuth);
+      } catch {
+        // Firebase not available, that's fine
+      }
+    }
     if (typeof window !== "undefined") {
       localStorage.removeItem("core_access_token");
       localStorage.removeItem("core_user_profile");
@@ -143,11 +199,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setToken(null);
-  };
+  }, []);
 
   return React.createElement(
     AuthContext.Provider,
-    { value: { user, firebaseUser, token, loading, error, logout } },
+    { value: { user, firebaseUser, token, loading, error, logout, loginDirect } },
     children
   );
 }
@@ -155,5 +211,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-
-

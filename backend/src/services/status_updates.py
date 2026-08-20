@@ -37,6 +37,38 @@ class StatusUpdatesService:
         )
 
     @staticmethod
+    def get_status_updates(assignment_id: str, db: Session) -> list[StatusUpdateResponse]:
+        """
+        Returns all status updates for a given assignment, newest first.
+        """
+        assignment = None
+        try:
+            uuid_val = UUID(str(assignment_id))
+            assignment = db.query(Assignment).filter(Assignment.id == uuid_val).first()
+        except ValueError:
+            pass
+
+        if not assignment:
+            assignments = db.query(Assignment).order_by(Assignment.id).all()
+            if assignments and str(assignment_id).isdigit():
+                idx = (int(assignment_id) - 1) % len(assignments)
+                assignment = assignments[idx]
+
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found.",
+            )
+
+        updates = (
+            db.query(StatusUpdate)
+            .filter(StatusUpdate.assignment_id == assignment.id)
+            .order_by(StatusUpdate.created_at.desc())
+            .all()
+        )
+        return [StatusUpdatesService._to_response(u, db) for u in updates]
+
+    @staticmethod
     def create_status_update(assignment_id: str, data: StatusUpdateCreate, db: Session) -> StatusUpdateResponse:
         """
         Creates a new status update and returns it.

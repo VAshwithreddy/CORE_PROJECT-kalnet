@@ -67,24 +67,46 @@ class ProjectsService:
         """
         Returns only the projects visible to the current user.
         - Privileged roles see all projects.
-        - Other roles see projects where they or their visible people are assigned.
+        - Department heads see all projects in their department + projects
+          where they or their visible people are assigned or are the owner.
+        - Other roles see projects where they or their visible people are
+          assigned, or where they are the owner, or in their department.
         """
         from src.core.rbac import RBACService, PRIVILEGED_ROLES
         from src.models.assignment import Assignment
+        from sqlalchemy import or_
 
         if current_user.role in PRIVILEGED_ROLES:
             projects = db.query(Project).all()
         else:
             visible_person_ids = RBACService.get_visible_person_ids(db, current_user)
+
+            # Projects from assignments
             project_ids = (
                 db.query(Assignment.project_id)
                 .filter(Assignment.person_id.in_(visible_person_ids))
                 .distinct()
                 .all()
             )
-            # project_ids is a list of tuples like [(uuid1,), (uuid2,)]
             pid_list = [p[0] for p in project_ids if p[0] is not None]
-            projects = db.query(Project).filter(Project.id.in_(pid_list)).all()
+
+            # Fetch current user's department
+            caller = db.query(Person).filter(Person.id == current_user.person_id).first()
+            user_dept_id = caller.department_id if caller else None
+
+            # Build filters: assignment-based OR owner-based OR department-based
+            filters = [Project.id.in_(pid_list)]
+
+            # Include projects owned by any visible person (covers newly
+            # created projects that have no assignments yet)
+            if visible_person_ids:
+                filters.append(Project.owner_id.in_(visible_person_ids))
+
+            # Include all projects in the user's department
+            if user_dept_id:
+                filters.append(Project.department_id == user_dept_id)
+
+            projects = db.query(Project).filter(or_(*filters)).all()
 
         return [_to_response(project, db) for project in projects]
 
@@ -178,8 +200,20 @@ class ProjectsService:
         target_date = data.target_date or data.due_date
 
         status_val = data.status or "planned"
-        if status_val == "planning":
-            status_val = "planned"
+        status_map = {
+            "new": "planned",
+            "planning": "planned",
+            "waiting": "planned",
+            "in-progress": "active",
+            "in_progress": "active",
+            "active": "active",
+            "blocked": "on_hold",
+            "on_hold": "on_hold",
+            "completed": "completed",
+            "archived": "cancelled",
+            "cancelled": "cancelled"
+        }
+        status_val = status_map.get(status_val.lower(), "planned")
 
         project = Project(
             name=data.name,
@@ -275,7 +309,23 @@ class ProjectsService:
 
         for key in ["name", "priority", "status"]:
             if key in update_data and update_data[key] is not None:
-                setattr(project, key, update_data[key])
+                val = update_data[key]
+                if key == "status":
+                    status_map = {
+                        "new": "planned",
+                        "planning": "planned",
+                        "waiting": "planned",
+                        "in-progress": "active",
+                        "in_progress": "active",
+                        "active": "active",
+                        "blocked": "on_hold",
+                        "on_hold": "on_hold",
+                        "completed": "completed",
+                        "archived": "cancelled",
+                        "cancelled": "cancelled"
+                    }
+                    val = status_map.get(val.lower(), val)
+                setattr(project, key, val)
 
         if "target_date" in update_data and update_data["target_date"] is not None:
             project.target_date = update_data["target_date"]
