@@ -31,7 +31,8 @@ from src.api.digests import router as digests_router
 from src.api.alerts import router as alerts_router
 from src.api.notifications import router as notifications_router
 from src.api.system import router as system_router
-from src.api.notifications import router as notifications_router
+from src.api.requests import router as requests_router
+from src.api.blockers import router as blockers_router
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -45,10 +46,11 @@ logger = logging.getLogger("core_api")
 
 def create_app() -> FastAPI:
     from src.core.database import init_db
-    try:
-        init_db()
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+    if settings.environment != "production":
+        try:
+            init_db()
+        except Exception as e:
+            logger.error("Failed to initialize development database: %s", e)
 
     app = FastAPI(
         title="CORE API",
@@ -64,9 +66,8 @@ def create_app() -> FastAPI:
     )
 
     # ── Global unhandled exception handler ────────────────────────────────────
-    # This catches any Exception that escapes route handlers and returns
-    # a JSON 500 with the real error message instead of a blank "Internal
-    # Server Error", making debugging in Postman / Swagger trivial.
+    # Log full failures server-side without exposing database internals or
+    # stack traces to browser clients.
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         tb = traceback.format_exc()
@@ -79,9 +80,7 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=500,
             content={
-                "detail": str(exc),
-                "type": type(exc).__name__,
-                "path": str(request.url),
+                "detail": "An unexpected server error occurred.",
             },
         )
 
@@ -89,6 +88,10 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
+        allow_origin_regex=(
+            r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$"
+            if settings.environment != "production" else None
+        ),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -157,16 +160,12 @@ def create_app() -> FastAPI:
         prefix="/api/v1/notifications",
         tags=["Notifications"],
     )
+    app.include_router(requests_router, prefix="/api/v1/requests", tags=["Requests"])
+    app.include_router(blockers_router, prefix="/api/v1/blockers", tags=["Blockers"])
     app.include_router(
         system_router,
         prefix="/api/v1/system",
     )
-    app.include_router(
-        notifications_router,
-        prefix="/api/v1/notifications",
-        tags=["Notifications"],
-    )
-
     return app
 
 

@@ -10,7 +10,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { TextInput, SelectInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getProjects, getPeople } from "@/lib/api";
+import { createProject, getPeople, getProjects } from "@/lib/api";
 
 export type ProjectHealth = "On Track" | "At Risk" | "Off Track" | "Delivered";
 
@@ -105,7 +105,7 @@ export default function ProjectsPage() {
   const [formStatusLabel, setFormStatusLabel] = useState("Scoping");
   const [formHealth, setFormHealth] = useState<ProjectHealth>("On Track");
   const [formOwner, setFormOwner] = useState("");
-  const [formDueDate, setFormDueDate] = useState("Q4 2026");
+  const [formDueDate, setFormDueDate] = useState("2026-12-31");
   const [formNextMilestone, setFormNextMilestone] = useState("Kickoff Meeting");
 
   useEffect(() => {
@@ -178,21 +178,27 @@ export default function ProjectsPage() {
     setFormNextMilestone("");
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formOwner || !formDueDate) {
       alert("Please fill out Name, Owner, and Due Date");
       return;
     }
 
-    const ownerName = teamMembers.find(m => m.value === formOwner)?.label || formOwner;
-
-    // Backend integration for creating project goes here
-    // createProject({ ... });
-
-    setNotice("Project created successfully.");
-    closeDrawer();
-    setTimeout(() => setNotice(""), 5000);
+    try {
+      const created = await createProject({
+        name: formName,
+        owner_id: formOwner,
+        status: formStatusLabel.toLowerCase(),
+        target_date: formDueDate,
+        metadata: { health: formHealth, next_milestone: formNextMilestone },
+      }, token || undefined);
+      setProjects((items) => [created, ...items]);
+      setNotice("Project created successfully.");
+      closeDrawer();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to create this project.");
+    }
   };
 
   if (!mounted) {
@@ -376,6 +382,7 @@ export default function ProjectsPage() {
               label="Due Date"
               value={formDueDate}
               onChange={(e) => setFormDueDate(e.target.value)}
+              type="date"
               required
             />
             <TextInput

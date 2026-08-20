@@ -24,7 +24,7 @@ import { useId, type ChangeEvent, type FocusEvent, type ReactNode } from "react"
 interface TextInputProps {
   id?: string;
   label: string;
-  type?: "text" | "email" | "password" | "number" | "search" | "tel" | "url";
+  type?: "text" | "email" | "password" | "number" | "search" | "tel" | "url" | "date";
   value?: string;
   defaultValue?: string;
   placeholder?: string;

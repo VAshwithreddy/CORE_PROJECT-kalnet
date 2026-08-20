@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerField, DrawerSection } from "@/components/detail-drawer";
 import { EmployeeShell } from "@/components/employee-shell";
@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { TextInput, TextArea, SelectInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
+import { createRequest, deleteRequest, getRequests } from "@/lib/api";
 
 type RequestType = "IT Support" | "HR" | "Access" | "Time Off";
 type RequestItem = {
@@ -22,6 +23,7 @@ type RequestItem = {
   submitted: string;
   updated: string;
   assignee: string;
+  isClosed: boolean;
 };
 
 const columns: DataTableColumn<RequestItem>[] = [
@@ -31,6 +33,12 @@ const columns: DataTableColumn<RequestItem>[] = [
     sortable: true,
     minWidth: "100px",
     render: (row) => <strong>{row.id}</strong>,
+  },
+  {
+    key: "isClosed",
+    header: "Lifecycle",
+    sortable: true,
+    render: (row) => <span>{row.isClosed ? "Closed" : "Open"}</span>,
   },
   {
     key: "title",
@@ -58,8 +66,19 @@ const columns: DataTableColumn<RequestItem>[] = [
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
+function toRequestItem(request: any): RequestItem {
+  const isClosed = request.status === "resolved" || request.status === "rejected";
+  const status = request.status === "approved" ? "approved" : request.status === "resolved" ? "completed" : request.status === "rejected" ? "blocked" : "waiting";
+  const statusLabel = request.status === "pending" ? "Pending Approval" : request.status === "in_review" ? "In Review" : request.status === "resolved" ? "Resolved / Closed" : request.status === "rejected" ? "Rejected / Closed" : request.status?.replace("_", " ") || "Pending Approval";
+  return {
+    id: String(request.id), title: request.title, type: request.type as RequestType, description: request.description,
+    submittedBy: request.requester_name, status, statusLabel, submitted: new Date(request.created_at).toLocaleDateString(),
+    updated: new Date(request.updated_at).toLocaleDateString(), assignee: request.assignee_name || request.department_name || "Unassigned", isClosed,
+  };
+}
+
 export default function RequestsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -87,6 +106,23 @@ export default function RequestsPage() {
     }
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    if (!token) return;
+    const data = await getRequests(token);
+    setRequests((Array.isArray(data) ? data : []).map(toRequestItem));
+  }, [token]);
+
+  useEffect(() => {
+    void loadRequests().catch(() => setNotice("Requests could not be loaded. Please refresh and try again."));
+    const interval = window.setInterval(() => void loadRequests(), 20_000);
+    const refreshOnFocus = () => { if (!document.hidden) void loadRequests(); };
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [loadRequests]);
+
   const requestTypes = useMemo(
     () => Array.from(new Set(requests.map((r) => r.type))),
     [requests]
@@ -106,7 +142,7 @@ export default function RequestsPage() {
     () => [
       {
         label: "Total Open",
-        value: requests.filter((r) => r.status !== "completed" && r.status !== "approved").length,
+        value: requests.filter((r) => !r.isClosed).length,
       },
       {
         label: "Pending Approval",
@@ -114,7 +150,7 @@ export default function RequestsPage() {
       },
       {
         label: "Recently Closed",
-        value: requests.filter((r) => r.status === "completed" || r.status === "approved").length,
+        value: requests.filter((r) => r.isClosed).length,
       },
     ],
     [requests]
@@ -134,16 +170,35 @@ export default function RequestsPage() {
     setFormType("IT Support");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formDesc.trim()) {
       alert("Please fill out all required fields.");
       return;
     }
-    // Simulate backend call
-    setNotice("Your request has been submitted successfully.");
-    closeDrawer();
-    setTimeout(() => setNotice(""), 5000);
+    try {
+      const created = await createRequest({ type: formType, title: formTitle, description: formDesc }, token || undefined);
+      const request = toRequestItem(created);
+      setRequests((items) => [request, ...items.filter((item) => item.id !== request.id)]);
+      void loadRequests().catch(() => undefined);
+      setNotice("Your request was submitted and is now pending approval.");
+      closeDrawer();
+      setTimeout(() => setNotice(""), 5000);
+    } catch {
+      setNotice("Your request could not be submitted. Please try again.");
+    }
+  };
+
+  const handleWithdraw = async (request: RequestItem) => {
+    if (!window.confirm(`Withdraw "${request.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteRequest(request.id, token || undefined);
+      setRequests((items) => items.filter((item) => item.id !== request.id));
+      setSelectedRequest(null);
+      setNotice("Your request was withdrawn.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to withdraw this request.");
+    }
   };
 
   if (!mounted) {
@@ -227,6 +282,7 @@ export default function RequestsPage() {
                 <option value="In Review">In Review</option>
                 <option value="Approved">Approved</option>
                 <option value="Resolved">Resolved</option>
+                <option value="Rejected / Closed">Rejected / Closed</option>
               </select>
             </label>
           </div>
@@ -239,6 +295,7 @@ export default function RequestsPage() {
               setActiveTab("Details");
             },
           },
+          ...(row.status === "waiting" && !row.isClosed ? [{ label: "Withdraw Request", onClick: () => void handleWithdraw(row) }] : []),
         ]}
         emptyState={{
           title: "No requests found",
@@ -274,9 +331,16 @@ export default function RequestsPage() {
               </button>
             </>
           ) : (
-            <button type="button" className="core-button" onClick={closeDrawer}>
-              Close
-            </button>
+            <>
+              {selectedRequest?.status === "waiting" && !selectedRequest.isClosed && (
+                <button type="button" className="core-button" onClick={() => void handleWithdraw(selectedRequest)}>
+                  Withdraw Request
+                </button>
+              )}
+              <button type="button" className="core-button" onClick={closeDrawer}>
+                Close
+              </button>
+            </>
           )
         }
       >

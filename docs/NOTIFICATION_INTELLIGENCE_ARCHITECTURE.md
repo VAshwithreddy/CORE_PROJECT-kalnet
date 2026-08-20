@@ -63,13 +63,10 @@ inspected. Several findings changed the design materially:
 
 ## 2. Security finding (reported separately, repeated here for the record)
 
-`backend/generate_tokens.py` contains a hardcoded Supabase database connection
-string (with credentials) and the JWT `SECRET_KEY`. `backend/tokens.txt` contains
-real signed JWTs. Neither file is covered by `.gitignore` (only `.env`/`.env.*`
-are). Per instruction, only the file paths are reported here, not the secret
-values. Recommended: rotate the DB password and `SECRET_KEY`, remove both files
-from git history, and gitignore them going forward. Not fixed as part of this
-work — credential rotation requires access this task doesn't have.
+Previously, local utility files exposed database and signing credentials. The
+utilities have been removed, generated tokens are ignored, and deployments must
+use deployment-managed secrets. Rotate any credentials that were used before
+this remediation.
 
 Also found, and fixed, since it directly affects notification data quality: the
 dev-seed in `core/database.py` set a seed `Assignment.status` to `"active"`, which
@@ -385,18 +382,10 @@ installed into it, would hit exactly that error the moment a test imported
 
 ### A new, more serious hardcoded-credential finding
 
-While verifying no new code introduced hardcoded credentials, a third instance
-was found (file path only, per standing instruction — not the credential
-itself): **`frontend/src/app/executive/db_query.py`**. Unlike the other two
-(`backend/generate_tokens.py`, `backend/tokens.txt`), this one is **live and
-wired up**: `frontend/src/app/executive/api/route.ts` shells out to this script
-on every request to `/executive/api`, which connects directly to Postgres with
-the hardcoded credential — and **that route has no authentication or
-authorization check of any kind**. Anyone who can reach it gets organizational
-aggregate data, entirely bypassing the FastAPI backend's RBAC and RLS. This is a
-different subsystem (the executive dashboard) than notifications and was not
-fixed here, but is a live vulnerability, not just an exposed credential —
-recommend treating it as urgent.
+The executive reporting route now requires an authenticated executive or system
+administrator session, uses only deployment-provided database configuration,
+and returns an unavailable response instead of demo data when reporting is not
+configured.
 
 ### Test coverage added
 

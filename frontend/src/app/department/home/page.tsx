@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { useAuth } from "@/lib/auth";
-import { getProjects, getBlockers, getPeople } from "@/lib/api";
+import { getProjects, getBlockers, getPeople, getRequests } from "@/lib/api";
 
 type ProjectHealth = "On Track" | "At Risk" | "Off Track" | "Delivered";
 
@@ -53,6 +53,7 @@ export default function DepartmentHomePage() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [blockerCount, setBlockerCount] = useState(0);
   const [departmentMembers, setDepartmentMembers] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -63,7 +64,8 @@ export default function DepartmentHomePage() {
       getProjects(token).catch(() => []),
       getBlockers(token).catch(() => []),
       getPeople(token).catch(() => []),
-    ]).then(([projData, blockerData, teamData]) => {
+      getRequests(token).catch(() => []),
+    ]).then(([projData, blockerData, teamData, requestData]) => {
       const allProjects = Array.isArray(projData) ? projData : [];
       setProjects(allProjects.filter((p: any) => p.departmentId === user.departmentId));
 
@@ -72,6 +74,7 @@ export default function DepartmentHomePage() {
 
       const allTeam = Array.isArray(teamData) ? teamData : [];
       setDepartmentMembers(allTeam.filter((m: any) => !m.departmentId || m.departmentId === user.departmentId));
+      setRequests(Array.isArray(requestData) ? requestData : []);
     });
   }, [token, user]);
 
@@ -81,9 +84,9 @@ export default function DepartmentHomePage() {
       { label: "Active Projects", value: projects.filter(p => p.status !== "completed").length },
       { label: "Active Blockers", value: blockerCount },
       { label: "Team Members", value: departmentMembers.length },
-      { label: "On Time Delivery", value: "92%" },
+      { label: "Pending Requests", value: requests.filter((request) => request.status === "pending" || request.status === "in_review").length },
     ];
-  }, [projects, blockerCount, departmentMembers, mounted]);
+  }, [projects, blockerCount, departmentMembers, mounted, requests]);
 
   if (!mounted) {
     return (
@@ -184,6 +187,17 @@ export default function DepartmentHomePage() {
             value={m.value}
           />
         ))}
+      </div>
+
+      <div className="core-panel" style={{ marginBottom: 32 }}>
+        <h2>Department Request Queue</h2>
+        <p>Requests routed to your department that need review.</p>
+        <ul className="mini-list" style={{ marginTop: 16 }}>
+          {requests.filter((request) => request.status === "pending" || request.status === "in_review").slice(0, 5).map((request) => (
+            <li key={request.id} className="mini-list__item"><span><span className="mini-list__title">{request.title}</span><span className="mini-list__meta">{request.type} · {request.requester_name} · {request.status.replace("_", " ")}</span></span></li>
+          ))}
+          {requests.filter((request) => request.status === "pending" || request.status === "in_review").length === 0 && <li className="mini-list__item"><span className="mini-list__meta">No pending department requests.</span></li>}
+        </ul>
       </div>
 
       <DataTable

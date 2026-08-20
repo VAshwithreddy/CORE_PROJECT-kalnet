@@ -479,11 +479,7 @@ useEffect(() => {
               <button
                 type="button"
                 className="core-button core-button-sm"
-                onClick={() =>
-                  alert(
-                    "Simulated Export: Briefing has been copied to clipboard!"
-                  )
-                }
+                onClick={() => navigator.clipboard.writeText(briefingText)}
                 style={{
                   fontSize: "12px",
                   minHeight: 28,

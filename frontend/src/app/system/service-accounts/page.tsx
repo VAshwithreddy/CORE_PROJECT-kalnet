@@ -1,61 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SystemAdminShell } from "@/components/system-admin-shell";
 import { PageHeader } from "@/components/page-header";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { useAuth } from "@/lib/auth";
+import { getServiceAccounts } from "@/lib/api";
 
-const SERVICE_ACCOUNTS = [
-  { id: "svc-ci", name: "core-ci-runner", purpose: "CI/CD Pipeline", scope: "assignments:read, projects:read", status: "active" as const, lastUsed: "2 mins ago" },
-  { id: "svc-notif", name: "core-notification-svc", purpose: "Notification Delivery", scope: "assignments:read", status: "active" as const, lastUsed: "5 mins ago" },
-  { id: "svc-report", name: "core-report-export", purpose: "Automated Reports", scope: "projects:read, people:read", status: "active" as const, lastUsed: "1 hour ago" },
-  { id: "svc-dep", name: "core-legacy-sync", purpose: "Legacy Data Sync", scope: "assignments:read", status: "inactive" as const, lastUsed: "3 months ago" },
-];
+type ServiceAccount = {
+  id: string;
+  name: string;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+};
 
-const columns: DataTableColumn<typeof SERVICE_ACCOUNTS[0]>[] = [
+const columns: DataTableColumn<ServiceAccount>[] = [
   { key: "id", header: "Account ID", sortable: true },
   { key: "name", header: "Name", sortable: true },
-  { key: "purpose", header: "Purpose", sortable: true },
-  { key: "scope", header: "Scope", minWidth: "240px" },
+  { key: "description", header: "Purpose", minWidth: "240px" },
   {
-    key: "status",
+    key: "is_active",
     header: "Status",
     sortable: true,
     render: (row) => (
       <StatusBadge
-        status={row.status === "active" ? "approved" : "archived"}
+        status={row.is_active ? "approved" : "archived"}
         size="sm"
-        label={row.status === "active" ? "Active" : "Inactive"}
+        label={row.is_active ? "Active" : "Inactive"}
       />
     ),
   },
-  { key: "lastUsed", header: "Last Used", sortable: true },
+  { key: "created_at", header: "Created", sortable: true },
 ];
 
 export default function ServiceAccountsPage() {
-  const [notice, setNotice] = useState("");
+  const { token } = useAuth();
+  const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!token) return;
+    getServiceAccounts(token)
+      .then((data) => setAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setError("Service accounts could not be loaded."))
+      .finally(() => setLoading(false));
+  }, [token]);
 
   return (
     <SystemAdminShell activePath="/system/service-accounts">
       <PageHeader
         title="Service Accounts"
         description="Machine identities used for automated pipelines and integrations."
-        primaryAction={{ label: "Create Account", href: "#" }}
       />
-      {notice && (
-        <div className="alert-strip alert-strip--info" style={{ marginBottom: 16 }}>
-          <span>{notice}</span>
+      {error && (
+        <div className="alert-strip alert-strip--error" style={{ marginBottom: 16 }}>
+          <span>{error}</span>
         </div>
       )}
       <DataTable
         columns={columns}
-        rows={SERVICE_ACCOUNTS}
+        rows={accounts}
+        loading={loading}
         rowKey={(r) => r.id}
-        rowActions={(row) => [
-          { label: "Rotate Key", onClick: () => setNotice(`Key rotation initiated for ${row.name}.`) },
-          { label: "Revoke", onClick: () => setNotice(`${row.name} would be revoked. (Demo mode.)`), danger: true },
-        ]}
       />
     </SystemAdminShell>
   );

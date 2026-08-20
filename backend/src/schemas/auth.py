@@ -8,6 +8,12 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="The user's password", example="secret123")
 
 
+class FirebaseSessionRequest(BaseModel):
+    """A Firebase ID token exchanged for a CORE API session."""
+
+    id_token: str = Field(..., min_length=100)
+
+
 class TokenResponse(BaseModel):
     """Response model returned after a successful login or token refresh."""
 

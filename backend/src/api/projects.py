@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from src.core.database import get_db, get_rls_db_for
 from src.core.dependencies import get_current_user, CurrentUser, require_roles
-from src.core.rbac import PRIVILEGED_ROLES
+from src.core.rbac import PRIVILEGED_ROLES, MANAGER_ROLES
+from src.models.person import Person
 from src.schemas.projects import ProjectResponse, ProjectCreate, ProjectUpdate
 from src.services.projects import ProjectsService
 
@@ -42,16 +43,28 @@ def get_project_by_id(
     response_model=ProjectResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Projects"],
-    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
 def create_project(
     project_data: ProjectCreate, 
-    db: Session = Depends(get_rls_db_for(get_current_user))
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> ProjectResponse:
     """
     Create a new project.
-    Only privileged roles can perform this action.
+    Department leaders can create projects for their own department.
     """
+    if current_user.role not in {"system_admin", "work_admin", "department_head"}:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Insufficient privileges to create projects.")
+
+    if current_user.role == "department_head":
+        caller = db.query(Person).filter(Person.id == current_user.person_id).first()
+        if not caller or not caller.department_id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Your account is not assigned to a department.")
+        # The backend, not the browser, determines the department for non-admins.
+        project_data.department_id = caller.department_id
+
     return ProjectsService.create_project(project_data, db)
 
 

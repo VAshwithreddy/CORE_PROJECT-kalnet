@@ -6,6 +6,7 @@ from src.schemas.status_updates import StatusUpdateResponse, StatusUpdateCreate
 from src.models.status_update import StatusUpdate
 from src.models.assignment import Assignment
 from src.models.person import Person
+from src.models.audit_log import AuditLog
 from uuid import UUID
 
 from src.services.notifications import (
@@ -103,7 +104,10 @@ class StatusUpdatesService:
             blockers=data.blockers,
         )
 
+        assignment.status = "done" if status_str == "completed" else status_str
+
         db.add(new_update)
+        db.add(AuditLog(actor_id=author.id, action="STATUS_UPDATE_CREATED", entity="assignment", entity_id=assignment.id, after_state={"status": status_str}, reason=data.message))
         try:
             db.commit()
             db.refresh(new_update)

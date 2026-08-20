@@ -29,6 +29,7 @@ def _make_token(person_id: str, role: str) -> str:
         "sub": person_id,
         "email": f"{role}@test.com",
         "role": role,
+        "aud": "authenticated",
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
         "iat": datetime.now(timezone.utc),
         "type": "access",

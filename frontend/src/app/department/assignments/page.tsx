@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput, TextInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getAssignments, getProjects, getPeople } from "@/lib/api";
+import { createAssignment, deleteAssignment, getAssignments, getPeople, getProjects, updateAssignment } from "@/lib/api";
 
 type Assignment = {
   id: string;
@@ -90,7 +90,7 @@ export default function AssignmentsPage() {
       setAssignments(all.filter((a: any) => !a.departmentId || a.departmentId === deptId));
 
       const allP = Array.isArray(pData) ? pData : [];
-      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.name || p.id, label: p.name })));
+      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.id, label: p.name })));
 
       const allT = Array.isArray(tData) ? tData : [];
       setTeamMembers(allT.filter((m: any) => !m.departmentId || m.departmentId === deptId).map((m: any) => ({ value: m.id, label: m.name })));
@@ -138,27 +138,56 @@ export default function AssignmentsPage() {
     [assignments]
   );
 
-  const handleReassign = (newOwnerId: string) => {
+  const handleReassign = async (newOwnerId: string) => {
     if (!selectedAssignment) return;
     const ownerName = teamMembers.find(m => m.value === newOwnerId)?.label || "Unknown";
-    // Backend PATCH /api/v1/assignments/{id} — would need privileged role
-    setNotice(`Reassignment to ${ownerName} queued. Backend update requires manager role.`);
-    setTimeout(() => setNotice(""), 4000);
+    try {
+      const updated = await updateAssignment(selectedAssignment.id, { person_id: newOwnerId }, token || undefined);
+      setAssignments((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setNotice(`Assignment reassigned to ${ownerName}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to reassign this assignment.");
+    }
   };
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!newTaskTitle || !newTaskProject || !newTaskOwner) {
       alert("Please fill in all required fields.");
       return;
     }
-    const ownerName = teamMembers.find(m => m.value === newTaskOwner)?.label || newTaskOwner;
-    // Backend POST /api/v1/assignments — requires privileged role
-    setNotice(`Assignment "${newTaskTitle}" creation queued. Backend requires manager role.`);
-    setTimeout(() => setNotice(""), 4000);
-    setIsNewTaskOpen(false);
-    setNewTaskTitle("");
-    setNewTaskProject("");
-    setNewTaskOwner("");
+    const daysByBucket = { today: 0, week: 7, later: 30, overdue: -1 };
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + daysByBucket[newTaskDueBucket]);
+    try {
+      const created = await createAssignment({
+        project_id: newTaskProject,
+        person_id: newTaskOwner,
+        role: newTaskTitle,
+        status: "active",
+        start_date: new Date().toISOString().slice(0, 10),
+        end_date: endDate.toISOString().slice(0, 10),
+      }, token || undefined);
+      setAssignments((items) => [created, ...items]);
+      setNotice(`Assignment "${newTaskTitle}" created.`);
+      setIsNewTaskOpen(false);
+      setNewTaskTitle("");
+      setNewTaskProject("");
+      setNewTaskOwner("");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to create this assignment.");
+    }
+  };
+
+  const handleDeleteTask = async (assignment: Assignment) => {
+    if (!window.confirm(`Delete "${assignment.title}"? Its status updates will also be removed.`)) return;
+    try {
+      await deleteAssignment(assignment.id, token || undefined);
+      setAssignments((items) => items.filter((item) => item.id !== assignment.id));
+      setSelectedAssignment(null);
+      setNotice(`Assignment "${assignment.title}" deleted.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to delete this assignment.");
+    }
   };
 
   if (!mounted) {
@@ -253,6 +282,10 @@ export default function AssignmentsPage() {
               setSelectedAssignment(row);
               setActiveTab("Details");
             },
+          },
+          {
+            label: "Delete Task",
+            onClick: () => void handleDeleteTask(row),
           },
         ]}
       />

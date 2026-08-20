@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/app-shell";
 import { Icon } from "@/components/core-icons";
 import { useAuth } from "@/lib/auth";
 import { useUnreadNotifications } from "@/components/notifications/use-unread-notifications";
+import { getBlockers } from "@/lib/api";
 
 interface DepartmentShellProps {
   children: ReactNode;
@@ -22,8 +23,16 @@ export function DepartmentShell({
   topbarActions,
   departmentName,
 }: DepartmentShellProps) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { unreadCount: notificationCount } = useUnreadNotifications(1);
+  const [blockerCount, setBlockerCount] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    getBlockers(token)
+      .then((blockers) => setBlockerCount(Array.isArray(blockers) ? blockers.length : 0))
+      .catch(() => setBlockerCount(0));
+  }, [token]);
 
   const effectiveDepartmentName = departmentName || user?.departmentName || "Loading...";
 
@@ -33,7 +42,7 @@ export function DepartmentShell({
     { label: "Projects", href: "/department/projects", icon: <Icon name="folder" /> },
     { label: "Assignments", href: "/department/assignments", icon: <Icon name="clipboard" /> },
     { label: "Planner", href: "/department/planner", icon: <Icon name="calendar" /> },
-    { label: "Blockers", href: "/department/blockers", icon: <Icon name="alert" />, badge: 2, badgeType: "danger" },
+    { label: "Blockers", href: "/department/blockers", icon: <Icon name="alert" />, badge: blockerCount || undefined, badgeType: "danger" },
     { label: "Digest", href: "/department/digest", icon: <Icon name="chart" /> },
     { label: "Notifications", href: "/department/notifications", icon: <Icon name="bell" />, badge: notificationCount > 0 ? notificationCount : undefined },
   ];

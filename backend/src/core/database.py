@@ -140,7 +140,7 @@ def get_db():
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection failed: {exc}",
+            detail="The database is temporarily unavailable. Please try again shortly.",
         )
 
     except SQLAlchemyError as exc:
@@ -148,7 +148,7 @@ def get_db():
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database Error: {exc}",
+            detail="A database operation could not be completed.",
         )
 
     finally:
@@ -197,4 +197,4 @@ def get_rls_db_for(current_user_dep):
             )
         return db
 
-    return _get_db_with_rls
+    return _get_db_with_rls

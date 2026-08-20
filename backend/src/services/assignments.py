@@ -9,8 +9,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from src.models.assignment import Assignment
+from src.models.audit_log import AuditLog
 from src.models.project import Project
 from src.models.person import Person
+from src.models.staleness_alert import StalenessAlert
+from src.models.status_update import StatusUpdate
 from src.schemas.assignments import (
     AssignmentResponse,
     AssignmentCreate,
@@ -517,3 +520,32 @@ class AssignmentsService:
             assignment,
             db,
         )
+
+    @staticmethod
+    def delete_assignment(assignment: Assignment, db: Session, actor_id: UUID) -> None:
+        """Delete a task and records that cannot outlive its assignment."""
+        before_state = {
+            "project_id": str(assignment.project_id),
+            "person_id": str(assignment.person_id),
+            "role": assignment.role,
+            "status": assignment.status,
+        }
+        db.query(StatusUpdate).filter(StatusUpdate.assignment_id == assignment.id).delete(synchronize_session=False)
+        db.query(StalenessAlert).filter(StalenessAlert.assignment_id == assignment.id).delete(synchronize_session=False)
+        db.add(AuditLog(
+            actor_id=actor_id,
+            action="ASSIGNMENT_DELETED",
+            entity="assignment",
+            entity_id=assignment.id,
+            before_state=before_state,
+            reason="Deleted by an authorized manager",
+        ))
+        db.delete(assignment)
+        try:
+            db.commit()
+        except SQLAlchemyError as error:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Database error while deleting assignment: {str(error.orig) if hasattr(error, 'orig') else str(error)}",
+            )

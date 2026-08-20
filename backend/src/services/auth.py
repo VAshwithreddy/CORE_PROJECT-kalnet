@@ -6,6 +6,7 @@ The Person table is used for credential lookup; no password column exists yet,
 so login validates user existence (email match) and issues a signed JWT.
 """
 import uuid
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict
 
@@ -33,6 +34,7 @@ def _create_access_token(person_id: str, email: str, role: str) -> str:
         "sub": person_id,
         "email": email,
         "role": role,
+        "aud": "authenticated",
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "access",
@@ -62,27 +64,18 @@ class AuthService:
         This implementation validates user *existence* and issues tokens.
         A proper password hash check should be added once the column is present.
         """
+        if not settings.allow_dev_passwordless_login:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password login is disabled. Sign in through Firebase.",
+            )
+
         user = db.query(Person).filter(
             (Person.email == data.username) |
             (Person.email.like(f"{data.username}@%")) |
             (Person.full_name == data.username) |
             (Person.full_name.like(f"%{data.username}%"))
         ).first()
-
-        if not user and ("jane" in data.username.lower() or "dummy" in data.username.lower()):
-            user = db.query(Person).first()
-
-        if not user and "@" in data.username:
-            # Auto-link fallback for unknown Google Sign-in emails to Alice Smith
-            target_person = db.query(Person).filter(Person.first_name == "Alice").first() or db.query(Person).first()
-            if target_person:
-                try:
-                    target_person.email = data.username.strip().lower()
-                    db.commit()
-                    db.refresh(target_person)
-                    user = target_person
-                except Exception:
-                    db.rollback()
 
         if not user:
             raise HTTPException(
@@ -102,18 +95,52 @@ class AuthService:
         )
 
     @staticmethod
+    def login_with_firebase(id_token: str, db: Session) -> tuple[TokenResponse, Person]:
+        """Verify a Firebase identity token and exchange it for a CORE session."""
+        if not settings.firebase_service_account_json:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Firebase authentication is not configured on this server.",
+            )
+        try:
+            import firebase_admin
+            from firebase_admin import auth as firebase_auth, credentials
+
+            try:
+                firebase_admin.get_app()
+            except ValueError:
+                credential_data = json.loads(settings.firebase_service_account_json)
+                firebase_admin.initialize_app(credentials.Certificate(credential_data))
+            claims = firebase_auth.verify_id_token(id_token, check_revoked=True)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired Firebase identity token.",
+            ) from exc
+
+        email = str(claims.get("email") or "").strip().lower()
+        if not email or not claims.get("email_verified"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="A verified company email is required.")
+        user = db.query(Person).filter(Person.email == email).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your Firebase account is not linked to an employee record.")
+
+        firebase_uid = str(claims.get("uid") or claims.get("sub") or "")
+        if firebase_uid and user.auth_user_id != firebase_uid:
+            user.auth_user_id = firebase_uid
+        role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+        access_token = _create_access_token(str(user.id), user.email, role_str)
+        refresh_token = _create_refresh_token(str(user.id))
+        db.commit()
+        return TokenResponse(access_token=access_token, refresh_token=refresh_token, token_type="bearer"), user
+
+    @staticmethod
     def refresh(data: RefreshRequest, db: Session) -> TokenResponse:
         """
         Validate the opaque refresh token and issue a new access+refresh pair.
         Raises 401 if the token is unknown or expired.
         """
         person_id = _refresh_tokens.pop(data.refresh_token, None)
-        if not person_id:
-            if "dummy" in data.refresh_token or "eyJ" in data.refresh_token:
-                first_user = db.query(Person).first()
-                if first_user:
-                    person_id = str(first_user.id)
-
         if not person_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from src.models.assignment import Assignment
+from src.models.person import Person
+from src.models.project import Project
 from typing import List
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -72,16 +74,30 @@ def get_assignment_by_id(
     "", 
     response_model=AssignmentResponse, 
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
 )
 def create_assignment(
     assignment_data: AssignmentCreate, 
-    db: Session = Depends(get_rls_db_for(get_current_user))
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> AssignmentResponse:
     """
     Create a new assignment linking a person to a project.
-    Only privileged roles can perform this action.
+    Privileged users can create any assignment. Department leaders can create
+    assignments only for people and projects that are already in their scope.
     """
+    if current_user.role not in {"system_admin", "work_admin", "department_head", "manager", "team_leader"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges to create assignments.")
+
+    if current_user.role not in {"system_admin", "work_admin"}:
+        visible_people = RBACService.get_visible_person_ids(db, current_user)
+        assignee_id = assignment_data.person_id or assignment_data.assignee_id
+        if not assignee_id or UUID(str(assignee_id)) not in visible_people:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only assign work to people in your scope.")
+        project = db.query(Project).filter(Project.id == UUID(str(assignment_data.project_id))).first()
+        caller = db.query(Person).filter(Person.id == current_user.person_id).first()
+        if not project or not caller or project.department_id != caller.department_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only assign work within your department.")
+
     return AssignmentsService.create_assignment(assignment_data, db)
 
 
@@ -117,3 +133,25 @@ def update_assignment(
     RBACService.assert_assignment_access(db, current_user, assignment)
 
     return AssignmentsService.update_assignment(assignment_id, assignment_data, db)
+
+
+@router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_assignment(
+    assignment_id: UUID,
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Delete an incorrectly assigned task within the caller's scope."""
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+
+    if current_user.role not in {"system_admin", "work_admin", "department_head"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot delete assignments.")
+    if current_user.role == "department_head":
+        caller = db.query(Person).filter(Person.id == current_user.person_id).first()
+        project = db.query(Project).filter(Project.id == assignment.project_id).first()
+        if not caller or not project or project.department_id != caller.department_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete tasks in your department.")
+
+    AssignmentsService.delete_assignment(assignment, db, current_user.person_id)

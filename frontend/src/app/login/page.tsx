@@ -77,7 +77,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user, loading: authLoading, error: authError, logout } = useAuth();
+  const { user, loading: authLoading, error: authError, logout, loginWithBackend } = useAuth();
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const isExecutingOAuthRef = useRef(false);
@@ -110,24 +110,6 @@ function LoginForm() {
 
   if (!mounted) return null;
 
-  const fetchSupabaseUserByEmail = async (userEmail: string): Promise<any | null> => {
-    const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/lookup?email=${encodeURIComponent(userEmail.trim().toLowerCase())}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return data as AuthUser;
-      }
-    } catch (err) {
-      console.warn("Backend email lookup failed:", err);
-    }
-    return null;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -141,22 +123,24 @@ function LoginForm() {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("active_login_attempt", "true");
       }
+
+      if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ALLOW_DEV_PASSWORDLESS_LOGIN !== "false") {
+        const loggedUser = await loginWithBackend(email.trim().toLowerCase(), password);
+        const target = redirectPath || ROLE_HOME_PATHS[loggedUser.role as keyof typeof ROLE_HOME_PATHS] || "/employee/home";
+        router.push(target);
+        return;
+      }
       await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
-      // Wait for useAuth effect / onAuthStateChanged to handle redirect and profile loading
     } catch (err: any) {
       console.error(err);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("active_login_attempt");
       }
       let errMsg = err?.message || "Authentication failed.";
-      if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-        errMsg = "Invalid email or password.";
-      }
       setError(errMsg);
       setLoading(false);
     }
   };
-
 
   const handleGoogleSignInClick = async () => {
     if (isExecutingOAuthRef.current || loading || authLoading) return;
@@ -189,12 +173,6 @@ function LoginForm() {
       setLoading(false);
       isExecutingOAuthRef.current = false;
     }
-  };
-
-  const fillCredentials = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
   };
 
   const inputStyle = (field: string): React.CSSProperties => ({
@@ -466,7 +444,6 @@ function LoginForm() {
                 <span style={{ color: "#10b981" }}><ShieldIcon /></span>
                 Role-based access, enforced on every request
               </div>
-
             </div>
 
             {/* Sign up */}
@@ -480,8 +457,6 @@ function LoginForm() {
               </a>
             </div>
           </div>
-
-          {/* Demo Users removed */}
         </div>
       </div>
 

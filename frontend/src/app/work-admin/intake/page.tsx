@@ -8,7 +8,7 @@ import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-dr
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getRequests } from "@/lib/api";
+import { getRequests, updateRequest } from "@/lib/api";
 
 export type RequestItem = {
   id: string;
@@ -64,9 +64,9 @@ export default function IntakePage() {
           title: r.title || r.reason || "Unknown Request",
           type: r.type || "General",
           submitted: r.submitted || r.created_at || new Date().toISOString().split("T")[0],
-          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "waiting",
-          statusLabel: r.status || "Pending",
-          assignee: r.assignee || "Unassigned",
+          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "blocked" : r.status === "resolved" ? "completed" : "waiting",
+          statusLabel: r.status === "pending" ? "Pending Approval" : r.status?.replace("_", " ") || "Pending",
+          assignee: r.assignee_name || r.department_name || "Unassigned",
           description: r.description || "No description provided",
           updated: r.updated || r.updated_at || new Date().toISOString().split("T")[0],
         })));
@@ -128,13 +128,32 @@ export default function IntakePage() {
           { label: "View Details", onClick: (r) => setSelected(r) },
           {
             label: "Route to Default Dept",
-            onClick: () => {
+            onClick: async () => {
               const targetDept = row.type === "IT Support" || row.type === "Access" ? "IT Operations" : row.type === "Time Off" ? "People Ops" : "HR";
-              // Simulated route action
-              setNotice(`${row.id} routed to ${targetDept} (Simulated).`);
+              try {
+                await updateRequest(row.id, { status: "in_review" }, token || undefined);
+                fetchRequests();
+                setNotice(`${row.id} routed to ${targetDept}.`);
+              } catch {
+                setNotice(`Unable to route ${row.id}. Please try again.`);
+              }
               setTimeout(() => setNotice(""), 3000);
             }
-          }
+          },
+          ...(row.status !== "completed" && row.status !== "blocked" ? [{
+            label: "Resolve & Close",
+            onClick: async () => {
+              try {
+                await updateRequest(row.id, { status: "resolved" }, token || undefined);
+                await fetchRequests();
+                setSelected(null);
+                setNotice(`${row.id} was resolved and closed.`);
+              } catch {
+                setNotice(`Unable to close ${row.id}. Please try again.`);
+              }
+              setTimeout(() => setNotice(""), 3000);
+            },
+          }] : []),
         ]}
       />
 

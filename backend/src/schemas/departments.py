@@ -12,7 +12,12 @@ class DepartmentResponse(BaseModel):
 
     id: UUID = Field(..., description="Department UUID")
     name: str = Field(..., description="Department name")
+    description: Optional[str] = Field(None, description="Department description")
     member_count: int = Field(..., description="Number of people in this department")
+    head_person_id: Optional[UUID] = Field(None, description="Department head UUID")
+    head_name: Optional[str] = Field(None, description="Department head name")
+    head_email: Optional[str] = Field(None, description="Department head email")
+    head_job_title: Optional[str] = Field(None, description="Department head job title")
 
     class Config:
         from_attributes = True

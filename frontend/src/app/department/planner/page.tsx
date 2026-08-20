@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { useAuth } from "@/lib/auth";
-import { getAssignments } from "@/lib/api";
+import { getAssignments, updateAssignment } from "@/lib/api";
 
 export type Assignment = {
   id: string;
@@ -116,16 +116,20 @@ export default function PlannerPage() {
 
   /* ── Quick status change handler ──────────────────────────────────────────── */
 
-  const cycleStatus = (item: Assignment) => {
+  const cycleStatus = async (item: Assignment) => {
     const current = plannerLabel(item.status);
     const nextLabel =
       STATUS_COLUMNS[
         (STATUS_COLUMNS.indexOf(current as (typeof STATUS_COLUMNS)[number]) + 1) %
           STATUS_COLUMNS.length
       ];
-    // Backend API call here to update assignment status
-    // updateAssignment(item.id, { status: plannerBadgeStatus(nextLabel) });
-    // sync();
+    const apiStatus = nextLabel === "Done" ? "done" : nextLabel === "Blocked" ? "blocked" : nextLabel === "Doing" ? "on_track" : "active";
+    try {
+      await updateAssignment(item.id, { status: apiStatus }, token || undefined);
+      await sync();
+    } catch (error) {
+      console.error("Unable to update planner status", error);
+    }
   };
 
   /* ── Render card ──────────────────────────────────────────────────────────── */

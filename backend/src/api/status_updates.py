@@ -53,4 +53,7 @@ def create_status_update(
     # Check access
     RBACService.assert_assignment_access(db, current_user, assignment)
 
+    # The authenticated employee is always the author; never trust a
+    # client-supplied author ID for an auditable workflow event.
+    update_data.author_id = current_user.person_id
     return StatusUpdatesService.create_status_update(assignment_id, update_data, db)

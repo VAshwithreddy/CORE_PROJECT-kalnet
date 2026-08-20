@@ -172,35 +172,43 @@ export default function EmployeeHomePage() {
       }
     };
     
-    if (!authLoading && token) {
-      fetchData();
-    } else if (!authLoading && !token) {
+    if (authLoading) return;
+    if (!token) {
       setLoadingData(false);
+      return;
     }
+
+    void fetchData();
+    const interval = window.setInterval(() => void fetchData(), 30_000);
+    const refreshOnFocus = () => { if (!document.hidden) void fetchData(); };
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
   }, [token, authLoading]);
 
   const assignments: AssignmentRow[] = useMemo(() => {
-    if (!dashboardData?.active_assignments) return [];
-    return dashboardData.active_assignments.map((a: any) => ({
-      id: a.assignment_id?.substring(0, 8) || "N/A",
-      project: a.project_name || "Unknown",
-      title: a.role || "Task",
-      status: a.status,
-      dueDate: a.due_date || "N/A",
-      allocationPercent: a.allocation_percent,
+    return allAssignments.map((assignment: any) => ({
+      id: String(assignment.id).slice(0, 8),
+      project: assignment.project || assignment.project_name || "Unknown",
+      title: assignment.title || assignment.role || "Task",
+      status: assignment.status,
+      dueDate: assignment.end_date || assignment.dueDate || "N/A",
+      allocationPercent: assignment.allocation_percent ?? 100,
     }));
-  }, [dashboardData]);
+  }, [allAssignments]);
 
   const metrics = useMemo(() => {
-    if (!mounted || !dashboardData) return [];
-    const summary = dashboardData.summary || {};
+    if (!mounted) return [];
+    const active = allAssignments.filter((assignment: any) => assignment.status !== "completed" && assignment.status !== "done");
     return [
-      { label: "Active Assignments", value: summary.active_assignments || 0 },
-      { label: "Completed Assignments", value: summary.completed_assignments || 0 },
-      { label: "Blocked Items", value: summary.blocked_count || 0 },
+      { label: "Active Assignments", value: active.length },
+      { label: "Completed Assignments", value: allAssignments.filter((assignment: any) => assignment.status === "completed" || assignment.status === "done").length },
+      { label: "Blocked Items", value: allAssignments.filter((assignment: any) => assignment.status === "blocked").length },
       { label: "Unread Alerts", value: alerts.length },
     ];
-  }, [dashboardData, alerts, mounted]);
+  }, [allAssignments, alerts, mounted]);
 
   const calendarAssignments = useMemo<CalendarAssignment[]>(() =>
     allAssignments.flatMap((assignment: any) =>
@@ -239,7 +247,7 @@ export default function EmployeeHomePage() {
     );
   }
 
-  if (!user || !dashboardData) {
+  if (!user) {
     return (
       <EmployeeShell activePath="/employee/home">
         <PageHeader
@@ -253,10 +261,9 @@ export default function EmployeeHomePage() {
     );
   }
 
-  const summary = dashboardData.summary || {};
-  const activeAssignmentsCount = summary.active_assignments || 0;
-  const blockedCount = summary.blocked_count || 0;
-  const completedCount = summary.completed_assignments || 0;
+  const activeAssignmentsCount = allAssignments.filter((assignment: any) => assignment.status !== "completed" && assignment.status !== "done").length;
+  const blockedCount = allAssignments.filter((assignment: any) => assignment.status === "blocked").length;
+  const completedCount = allAssignments.filter((assignment: any) => assignment.status === "completed" || assignment.status === "done").length;
 
   return (
     <EmployeeShell activePath="/employee/home">

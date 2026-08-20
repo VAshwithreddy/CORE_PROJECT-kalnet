@@ -8,7 +8,7 @@ import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getRequests } from "@/lib/api";
+import { getRequests, updateRequest } from "@/lib/api";
 
 type RequestItem = {
   id: string;
@@ -63,9 +63,9 @@ export default function RoutingPage() {
           title: r.title || r.reason || "Unknown Request",
           type: r.type || "General",
           submitted: r.submitted || r.created_at || new Date().toISOString().split("T")[0],
-          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "waiting",
-          statusLabel: r.status || "Pending",
-          assignee: r.assignee || "Unassigned",
+          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "blocked" : r.status === "resolved" ? "completed" : "waiting",
+          statusLabel: r.status === "pending" ? "Pending Approval" : r.status?.replace("_", " ") || "Pending",
+          assignee: r.assignee_name || r.department_name || "Unassigned",
           description: r.description || "No description provided",
           updated: r.updated || r.updated_at || new Date().toISOString().split("T")[0],
         })));

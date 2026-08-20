@@ -111,6 +111,17 @@ const columns: DataTableColumn<TeamMember>[] = [
 
 const filterSelectStyle = { height: 36, minWidth: 132 } as const;
 
+function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number>>) {
+  const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+  const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function TeamPage() {
   const { user, token } = useAuth();
   /* ── Live state ───────────────────────────────────────────────────────────── */
@@ -142,7 +153,7 @@ export default function TeamPage() {
 
       const enriched = members.map((m: any) => {
         const myAssignments = allAssignments.filter((a: any) => a.owner === m.name);
-        const myBlockers = allBlockers.filter((b: any) => b.owner === m.name);
+        const myBlockers = allBlockers.filter((b: any) => b.owner_name === m.name || b.owner_id === m.id);
         return {
           ...m,
           activeAssignments: myAssignments.filter(
@@ -206,10 +217,20 @@ export default function TeamPage() {
 
   /* ── Drawer actions ───────────────────────────────────────────────────────── */
 
-  const handleAdjustLoad = (memberId: string, delta: number) => {
-    // updateTeamMemberLoad(memberId, delta);
-    // sync();
-    setNotice(`Backend load adjustment not implemented yet.`);
+  const handleAdjustLoad = () => {
+    setNotice("Capacity is calculated from live assignments. Reassign or create work to change it.");
+  };
+
+  const handleExport = () => {
+    downloadCsv("core-department-team.csv", ["Name", "Role", "Availability", "Active assignments", "Open blockers", "Load"], teamMembers.map((member) => [
+      member.name,
+      member.role,
+      member.availability,
+      member.activeAssignments,
+      member.blockers,
+      `${member.currentLoad}%`,
+    ]));
+    setNotice("Team list downloaded as CSV.");
   };
 
   return (
@@ -224,7 +245,7 @@ export default function TeamPage() {
         meta={<span>Engineering scope</span>}
         primaryAction={{
           label: "Export Team List",
-          onClick: () => setNotice("Team export is ready for permission-gated API wiring."),
+          onClick: handleExport,
         }}
         secondaryActions={[
           {
@@ -440,14 +461,14 @@ export default function TeamPage() {
               <button
                 type="button"
                 className="core-button core-button-ghost"
-                onClick={() => handleAdjustLoad(selectedMember.id, -10)}
+                onClick={handleAdjustLoad}
               >
                 − Reduce Load 10%
               </button>
               <button
                 type="button"
                 className="core-button core-button-ghost"
-                onClick={() => handleAdjustLoad(selectedMember.id, 10)}
+                onClick={handleAdjustLoad}
               >
                 + Increase Load 10%
               </button>

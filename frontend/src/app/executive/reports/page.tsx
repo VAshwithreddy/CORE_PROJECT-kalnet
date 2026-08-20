@@ -35,6 +35,17 @@ interface SavedReport {
   author: string;
 }
 
+function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number>>) {
+  const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+  const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ExecutiveReportsPage() {
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +56,15 @@ export default function ExecutiveReportsPage() {
   const [deptScope, setDeptScope] = useState("all");
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  const exportPreviewCsv = () => {
+    if (!previewData) return;
+    downloadCsv("core-executive-report.csv", ["Strategic item", "Metric", "Status"], previewData.rows.map((row: any) => [row.item, row.progress, row.status]));
+  };
+
+  const downloadAuditRecord = (row: SavedReport) => {
+    downloadCsv("core-report-record.csv", ["Report", "Template", "Generated", "Format", "Author"], [[row.name, row.template, row.date, row.format, row.author]]);
+  };
 
   // Fetch reports log (composed of live audit logs)
   useEffect(() => {
@@ -83,7 +103,7 @@ export default function ExecutiveReportsPage() {
           type="button"
           className="core-button core-button-sm core-button-ghost"
           style={{ minHeight: 28, fontSize: "12px" }}
-          onClick={() => alert(`Simulated Download: Fetching ${row.name}.${row.format.toLowerCase()}`)}
+          onClick={() => downloadAuditRecord(row)}
         >
           <DownloadIcon />
           Download
@@ -253,7 +273,7 @@ export default function ExecutiveReportsPage() {
                   type="button"
                   className="core-button core-button-ghost"
                   style={{ minHeight: 36, fontSize: "13px" }}
-                  onClick={() => alert("Simulated CSV Export: Report successfully saved to downloads folder.")}
+                  onClick={exportPreviewCsv}
                 >
                   <DownloadIcon /> Export CSV
                 </button>
@@ -261,7 +281,7 @@ export default function ExecutiveReportsPage() {
                   type="button"
                   className="core-button"
                   style={{ minHeight: 36, fontSize: "13px" }}
-                  onClick={() => alert("Simulated PDF Export: Report successfully compiled as PDF and saved to downloads.")}
+                  onClick={() => window.print()}
                 >
                   <DownloadIcon /> Export PDF
                 </button>

@@ -256,11 +256,7 @@ class NotificationRulesEngine:
                 message=f"You were assigned to {project_name} as {assignment.role}.",
                 entity_type=NotificationEntityType.ASSIGNMENT,
                 entity_id=assignment.id,
-                action_url=build_action_url(
-                    entity_type=NotificationEntityType.ASSIGNMENT,
-                    notification_type=NotificationType.WORK_ASSIGNED,
-                    for_assignee=True,
-                ),
+                action_url=f"/employee/my-work?assignment={assignment.id}",
                 dedup_key=f"WORK_ASSIGNED:assignment:{assignment.id}",
             )
         ]
@@ -285,11 +281,7 @@ class NotificationRulesEngine:
                 message=f"You are now assigned to {project_name} as {assignment.role}.",
                 entity_type=NotificationEntityType.ASSIGNMENT,
                 entity_id=assignment.id,
-                action_url=build_action_url(
-                    entity_type=NotificationEntityType.ASSIGNMENT,
-                    notification_type=NotificationType.WORK_REASSIGNED,
-                    for_assignee=True,
-                ),
+                action_url=f"/employee/my-work?assignment={assignment.id}",
                 dedup_key=f"WORK_REASSIGNED_TO:assignment:{assignment.id}:{trigger_ref}",
             ),
             NotificationDraft(

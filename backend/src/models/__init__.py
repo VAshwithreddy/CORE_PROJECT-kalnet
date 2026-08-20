@@ -17,6 +17,7 @@ from src.models.notification import Notification
 from src.models.notification_enrichment import NotificationEnrichment
 from src.models.audit_log import AuditLog
 from src.models.service_account import ServiceAccount
+from src.models.work_request import WorkRequest
 
 __all__ = [
     "Department",
@@ -31,4 +32,5 @@ __all__ = [
     "NotificationEnrichment",
     "AuditLog",
     "ServiceAccount",
+    "WorkRequest",
 ]

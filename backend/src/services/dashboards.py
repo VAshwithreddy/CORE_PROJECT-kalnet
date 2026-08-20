@@ -62,10 +62,9 @@ class DashboardsService:
 
         active_assignments = []
         total_allocation = 0
-        blocked_count = 0
-
         for a in assignments:
-            if a.status == "active":
+            assignment_status = a.status.value if hasattr(a.status, "value") else str(a.status)
+            if assignment_status not in {"done", "completed", "cancelled"}:
                 proj = db.query(Project).filter(Project.id == a.project_id).first()
                 proj_name = proj.name if proj else "Unknown"
                 alloc = a.allocation_percent if a.allocation_percent is not None else 0
@@ -96,13 +95,20 @@ class DashboardsService:
                 "message": u.progress_note or "",
                 "created_at": u.created_at.isoformat() if u.created_at else "",
             })
-            if status_val == "blocked":
-                blocked_count += 1
+        blocked_count = sum(
+            1
+            for assignment in assignments
+            if (assignment.status.value if hasattr(assignment.status, "value") else str(assignment.status)) == "blocked"
+        )
 
         summary = {
             "total_assignments": len(assignments),
             "active_assignments": len(active_assignments),
-            "completed_assignments": sum(1 for a in assignments if a.status == "completed"),
+            "completed_assignments": sum(
+                1
+                for a in assignments
+                if (a.status.value if hasattr(a.status, "value") else str(a.status)) in {"done", "completed"}
+            ),
             "total_allocation_percent": total_allocation,
             "blocked_count": blocked_count,
         }

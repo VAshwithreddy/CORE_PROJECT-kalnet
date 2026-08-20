@@ -6,7 +6,9 @@ from fastapi import HTTPException, status
 
 from src.models.person import Person
 from src.models.department import Department
-from src.schemas.people import PersonResponse, PersonDetailResponse
+from src.models.audit_log import AuditLog
+from src.models.enums import Availability, Role
+from src.schemas.people import PersonCreate, PersonResponse, PersonDetailResponse, PersonOrganizationUpdate
 from src.core.rbac import RBACService
 from src.core.dependencies import CurrentUser
 
@@ -89,4 +91,109 @@ class PeopleService:
             skills=person.skills,
             created_at=person.created_at,
         )
+
+    @staticmethod
+    def update_organization(
+        person_id: str,
+        data: PersonOrganizationUpdate,
+        db: Session,
+        actor: CurrentUser,
+    ) -> PersonDetailResponse:
+        """Place an existing person in a department and optionally appoint its head."""
+        try:
+            person = db.query(Person).filter(Person.id == UUID(str(person_id))).first()
+        except ValueError:
+            person = None
+        if not person:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found.")
+
+        department = db.query(Department).filter(Department.id == data.department_id).first()
+        if not department:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department not found.")
+
+        try:
+            role = Role(data.role)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization role.") from exc
+
+        manager = None
+        if data.manager_id:
+            manager = db.query(Person).filter(Person.id == data.manager_id).first()
+            if not manager or manager.department_id != department.id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Manager must belong to the selected department.")
+            if manager.id == person.id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A person cannot manage themselves.")
+
+        person.department_id = department.id
+        person.manager_id = manager.id if manager else None
+        person.role = role
+
+        if role == Role.department_head:
+            department.head_person_id = person.id
+        elif department.head_person_id == person.id:
+            department.head_person_id = None
+
+        db.add(AuditLog(
+            actor_id=actor.person_id,
+            action="PERSON_ORGANIZATION_UPDATED",
+            entity="person",
+            entity_id=person.id,
+            after_state={
+                "role": role.value,
+                "department_id": str(department.id),
+                "manager_id": str(manager.id) if manager else None,
+            },
+        ))
+        db.commit()
+        db.refresh(person)
+        return PeopleService.get_person_by_id(str(person.id), db, actor)
+
+    @staticmethod
+    def create_person(
+        data: PersonCreate,
+        db: Session,
+        actor: CurrentUser,
+    ) -> PersonDetailResponse:
+        """Create a directory record that can immediately use CORE sign-in."""
+        email = data.email.strip().lower()
+        if db.query(Person).filter(Person.email == email).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An employee with this email already exists.")
+
+        department = db.query(Department).filter(Department.id == data.department_id).first()
+        if not department:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department not found.")
+        try:
+            role = Role(data.role)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization role.") from exc
+
+        manager = None
+        if data.manager_id:
+            manager = db.query(Person).filter(Person.id == data.manager_id).first()
+            if not manager or manager.department_id != department.id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Manager must belong to the selected department.")
+
+        person = Person(
+            full_name=data.full_name.strip(),
+            email=email,
+            job_title=data.job_title.strip() if data.job_title else None,
+            role=role,
+            availability=Availability.available,
+            department_id=department.id,
+            manager_id=manager.id if manager else None,
+        )
+        db.add(person)
+        db.flush()
+        if role == Role.department_head:
+            department.head_person_id = person.id
+        db.add(AuditLog(
+            actor_id=actor.person_id,
+            action="PERSON_CREATED",
+            entity="person",
+            entity_id=person.id,
+            after_state={"email": email, "role": role.value, "department_id": str(department.id)},
+        ))
+        db.commit()
+        db.refresh(person)
+        return PeopleService.get_person_by_id(str(person.id), db, actor)
 

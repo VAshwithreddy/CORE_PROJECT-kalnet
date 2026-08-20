@@ -168,6 +168,7 @@ def make_token(person) -> str:
         "sub": str(person.auth_user_id),
         "email": person.email,
         "role": person.role.value if hasattr(person.role, "value") else str(person.role),
+        "aud": "authenticated",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=60),
         "iat": datetime.now(timezone.utc),
         "type": "access",

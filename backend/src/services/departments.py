@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.models.department import Department
+from src.models.enums import Role
 from src.models.person import Person
 from src.schemas.departments import (
     DepartmentResponse,
@@ -30,12 +31,35 @@ class DepartmentsService:
                 .filter(Person.department_id == dept.id)
                 .count()
             )
+            head = None
+            if dept.head_person_id:
+                head = (
+                    db.query(Person)
+                    .filter(Person.id == dept.head_person_id)
+                    .first()
+                )
+            if not head:
+                # Support existing records that were assigned the department-head
+                # role before the explicit department.head_person_id link existed.
+                head = (
+                    db.query(Person)
+                    .filter(
+                        Person.department_id == dept.id,
+                        Person.role == Role.department_head,
+                    )
+                    .first()
+                )
 
             response.append(
                 DepartmentResponse(
                     id=dept.id,
                     name=dept.name,
+                    description=dept.description,
                     member_count=member_count,
+                    head_person_id=head.id if head else dept.head_person_id,
+                    head_name=head.full_name if head else None,
+                    head_email=head.email if head else None,
+                    head_job_title=head.job_title if head else None,
                 )
             )
 

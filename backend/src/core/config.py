@@ -22,6 +22,8 @@ class Settings:
     refresh_token_expire_days: int
     jwt_algorithms: list[str]
     jwks_url: str
+    allow_dev_passwordless_login: bool
+    firebase_service_account_json: str
 
     # Notification AI Intelligence
     ai_enabled: bool
@@ -37,6 +39,14 @@ class Settings:
 def load_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL", "")
     jwks_url = os.getenv("JWKS_URL", "")
+    environment = os.getenv("CORE_ENV", "development").lower()
+    secret_key = os.getenv("SECRET_KEY", "")
+    if environment == "production" and (not secret_key or secret_key == "insecure-default-secret-key"):
+        raise RuntimeError("SECRET_KEY must be set to a strong unique value in production.")
+    if environment == "production" and not os.getenv("CORE_ALLOWED_ORIGINS"):
+        raise RuntimeError("CORE_ALLOWED_ORIGINS must list the production frontend origin.")
+    if environment == "production" and not os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"):
+        raise RuntimeError("FIREBASE_SERVICE_ACCOUNT_JSON must be configured in production.")
 
     if not jwks_url:
         # Extract from database_url if it's a Supabase pooler/direct connection
@@ -49,16 +59,13 @@ def load_settings() -> Settings:
 
     return Settings(
         project_name=os.getenv("CORE_PROJECT_NAME", "CORE API"),
-        environment=os.getenv("CORE_ENV", "development"),
+        environment=environment,
         allowed_origins=_csv_env(
             "CORE_ALLOWED_ORIGINS",
-            "http://localhost:3000",
+            "http://localhost:3000,http://127.0.0.1:3000",
         ),
         database_url=database_url,
-        secret_key=os.getenv(
-            "SECRET_KEY",
-            "insecure-default-secret-key",
-        ),
+        secret_key=secret_key or "insecure-default-secret-key",
         access_token_expire_minutes=int(
             os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
         ),
@@ -70,6 +77,11 @@ def load_settings() -> Settings:
             "HS256,ES256,RS256",
         ),
         jwks_url=jwks_url,
+        allow_dev_passwordless_login=os.getenv(
+            "CORE_ALLOW_DEV_PASSWORDLESS_LOGIN",
+            "true" if environment != "production" else "false",
+        ).lower() == "true",
+        firebase_service_account_json=os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", ""),
 
         # Notification AI Intelligence
         ai_enabled=os.getenv("AI_ENABLED", "false").lower() == "true",

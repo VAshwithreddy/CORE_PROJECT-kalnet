@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
 import { useAuth } from "@/lib/auth";
-import { getAssignments } from "@/lib/api";
+import { getBlockers, resolveBlocker } from "@/lib/api";
 
 export type BlockerItem = {
   id: string;
@@ -56,30 +56,27 @@ export default function EscalationsPage() {
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  const fetchBlockers = useCallback(() => {
+  const fetchBlockers = useCallback(async () => {
     if (!token) return;
-    getAssignments(token)
-      .then((data: any) => {
+    try {
+      const data: any = await getBlockers(token);
         const all = Array.isArray(data) ? data : [];
         const orgBlockers = all
-          .filter((a: any) => a.status === "blocked")
-          .map((a: any, i: number): BlockerItem => ({
-            id: a.id || `BLK-${i}`,
-            title: a.title || "Unknown Blocked Item",
-            project: a.projectName || a.project_name || a.project || "Unknown Project",
-            owner: a.owner || a.person_name || "Unassigned",
-            severity: (a.priority === "High" || a.priority === "Urgent") ? "High" : "Medium",
-            daysBlocked: a.daysBlocked || Math.floor(Math.random() * 5) + 1, // simulated metric
-            reason: "Waiting on external dependency", // placeholder since reason isn't in assignment natively
+          .map((item: any): BlockerItem => ({
+            id: item.assignment_id, title: item.title, project: item.project_name, owner: item.owner_name,
+            severity: item.severity, daysBlocked: item.days_blocked, reason: item.reason,
           }));
         setBlockers(orgBlockers);
-      })
-      .catch(() => setBlockers([]));
+    } catch {
+      setBlockers([]);
+    }
   }, [token]);
 
   useEffect(() => {
     setMounted(true);
-    fetchBlockers();
+    void fetchBlockers();
+    const interval = window.setInterval(() => void fetchBlockers(), 20_000);
+    return () => window.clearInterval(interval);
   }, [fetchBlockers]);
 
   const highSeverity = useMemo(() => blockers.filter((b) => b.severity === "High"), [blockers]);
@@ -121,8 +118,13 @@ export default function EscalationsPage() {
         rowKey={(b) => b.id}
         rowActions={(row) => [
           { label: "View Details", onClick: (r) => setSelected(r) },
-          { label: "Escalate to Executive", onClick: () => {
-            setNotice(`${row.id} has been escalated to executive review (Simulated).`);
+          { label: "Resolve", onClick: async () => {
+            try {
+              await resolveBlocker(row.id, "Resolved by Work Admin.", token || undefined);
+              await fetchBlockers();
+              setSelected(null);
+              setNotice(`${row.id} was resolved.`);
+            } catch { setNotice(`Unable to resolve ${row.id}. Please try again.`); }
             setTimeout(() => setNotice(""), 3000);
           } },
         ]}

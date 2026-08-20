@@ -31,3 +31,22 @@ class PersonDetailResponse(PersonResponse):
 
     class Config:
         from_attributes = True
+
+
+class PersonOrganizationUpdate(BaseModel):
+    """System-admin-only organization placement for an existing employee."""
+
+    role: str
+    department_id: UUID
+    manager_id: Optional[UUID] = None
+
+
+class PersonCreate(BaseModel):
+    """System-admin input for creating an employee directory record."""
+
+    full_name: str = Field(..., min_length=2, max_length=160)
+    email: str = Field(..., min_length=3, max_length=254)
+    job_title: Optional[str] = Field(None, max_length=160)
+    role: str = "employee"
+    department_id: UUID
+    manager_id: Optional[UUID] = None

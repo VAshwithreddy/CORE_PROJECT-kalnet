@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DepartmentShell } from "@/components/department-shell";
 import { DetailDrawer, DrawerField, DrawerSection } from "@/components/detail-drawer";
@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { SelectInput, TextArea } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getAssignments } from "@/lib/api";
+import { getBlockers, resolveBlocker } from "@/lib/api";
 
 export type BlockerItem = {
   id: string;
@@ -79,34 +79,30 @@ export default function BlockersPage() {
   const [notice, setNotice] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
+  const loadBlockers = useCallback(async () => {
     if (!token || !user) return;
-
-    // Fetch blocked assignments from the assignments endpoint
-    getAssignments(token)
-      .then((data: any) => {
+    try {
+      const data: any = await getBlockers(token);
         const all = Array.isArray(data) ? data : [];
-        // Filter to blocked assignments in the user's department
         const deptBlockers = all
-          .filter((a: any) => a.status === "blocked" && (!a.departmentId || a.departmentId === user.departmentId))
-          .map((a: any, i: number): BlockerItem => ({
-            id: a.id,
-            title: a.title,
-            project: a.projectName || a.project_name || "",
-            projectId: a.projectId || a.project_id || "",
-            owner: a.owner || a.person_name || "",
-            ownerId: a.ownerId || a.person_id || "",
-            departmentId: a.departmentId || "",
-            severity: i % 3 === 0 ? "High" : i % 3 === 1 ? "Medium" : "Low",
-            daysBlocked: Math.floor(Math.random() * 10) + 1,
-            reason: a.statusLabel || "Blocked — awaiting dependency resolution",
-            status: a.status,
+          .filter((item: any) => !item.department_id || item.department_id === user.departmentId)
+          .map((item: any): BlockerItem => ({
+            id: item.assignment_id, title: item.title, project: item.project_name, projectId: item.project_id,
+            owner: item.owner_name, ownerId: item.owner_id, departmentId: item.department_id || "",
+            severity: item.severity, daysBlocked: item.days_blocked, reason: item.reason, status: "blocked",
           }));
         setBlockers(deptBlockers);
-      })
-      .catch(() => setBlockers([]));
+    } catch {
+      setBlockers([]);
+    }
   }, [token, user]);
+
+  useEffect(() => {
+    setMounted(true);
+    void loadBlockers();
+    const interval = window.setInterval(() => void loadBlockers(), 20_000);
+    return () => window.clearInterval(interval);
+  }, [loadBlockers]);
 
   // Keep drawer in sync if list updates
   useEffect(() => {
@@ -142,18 +138,22 @@ export default function BlockersPage() {
     [blockers]
   );
 
-  const handleResolve = () => {
+  const handleResolve = async () => {
     if (!selectedBlocker) return;
-    // Backend endpoint for resolving blockers not yet available
-    setBlockers(prev => prev.filter(b => b.id !== selectedBlocker.id));
-    setNotice(`Blocker ${selectedBlocker.id} marked as resolved.`);
-    setSelectedBlocker(null);
-    setTimeout(() => setNotice(""), 4000);
+    try {
+      await resolveBlocker(selectedBlocker.id, "Resolved by department triage.", token || undefined);
+      setBlockers(prev => prev.filter(b => b.id !== selectedBlocker.id));
+      setNotice(`Blocker ${selectedBlocker.id} marked as resolved.`);
+      setSelectedBlocker(null);
+      setTimeout(() => setNotice(""), 4000);
+    } catch {
+      setNotice("The blocker could not be resolved. Please try again.");
+    }
   };
 
   const handleEscalate = () => {
     if (!selectedBlocker) return;
-    setNotice(`Blocker ${selectedBlocker.id} has been escalated to leadership.`);
+    setNotice(`Blocker ${selectedBlocker.id} is visible in the Work Admin escalation queue.`);
     setTimeout(() => setNotice(""), 4000);
   };
 

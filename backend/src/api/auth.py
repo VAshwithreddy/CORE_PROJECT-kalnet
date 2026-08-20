@@ -1,7 +1,10 @@
 from fastapi import APIRouter, status, Query
-from src.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutResponse
+from src.schemas.auth import FirebaseSessionRequest, LoginRequest, TokenResponse, RefreshRequest, LogoutResponse
 from src.services.auth import AuthService
-from src.core.database import get_db
+from src.core.config import settings
+from src.core.database import get_db, get_rls_db_for
+from src.core.dependencies import CurrentUser, get_current_user
+from src.core.rbac import RBACService
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from src.models.person import Person
@@ -12,6 +15,26 @@ from fastapi.responses import JSONResponse
 from uuid import UUID
 
 router = APIRouter()
+
+
+def _profile_response(person: Person, db: Session) -> dict:
+    dept_name = "General"
+    if person.department_id:
+        dept = db.query(Department).filter(Department.id == person.department_id).first()
+        dept_name = dept.name if dept else "General"
+    role_value = person.role.value if hasattr(person.role, "value") else str(person.role)
+    role_map = {
+        "department_head": "department_head", "work_admin": "work_admin", "system_admin": "system_admin",
+        "executive": "executive", "employee": "employee", "manager": "employee", "team_leader": "employee",
+    }
+    full_name = person.full_name or ""
+    return {
+        "id": str(person.id), "name": full_name or person.email.split("@")[0], "email": person.email,
+        "role": role_map.get(role_value, role_value), "roleLabel": person.job_title or "Member",
+        "departmentId": str(person.department_id) if person.department_id else "dept-general",
+        "departmentName": dept_name,
+        "initials": "".join(part[0].upper() for part in full_name.split() if part)[:2] or person.email[0].upper(),
+    }
 
 
 @router.get(
@@ -30,54 +53,20 @@ def lookup_user_by_email(
     the user's role and department from the database.
     No authentication required — email is validated against the people table.
     """
+    if not settings.allow_dev_passwordless_login:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
     person = db.query(Person).filter(Person.email == email.strip().lower()).first()
-    if not person:
-        # Auto-link fallback for unknown Google Sign-in emails to Alice Smith
-        target_person = db.query(Person).filter(Person.first_name == "Alice").first() or db.query(Person).first()
-        if target_person:
-            try:
-                target_person.email = email.strip().lower()
-                db.commit()
-                db.refresh(target_person)
-                person = target_person
-            except Exception:
-                db.rollback()
-
     if not person:
         return JSONResponse(status_code=404, content={"detail": "User not found"})
 
-    dept_name = "General"
-    if person.department_id:
-        dept = db.query(Department).filter(Department.id == person.department_id).first()
-        dept_name = dept.name if dept else "General"
+    return _profile_response(person, db)
 
-    role_value = person.role.value if hasattr(person.role, "value") else str(person.role)
 
-    # Map DB roles to frontend roles
-    role_map = {
-        "department_head": "department_head",
-        "work_admin": "work_admin",
-        "system_admin": "system_admin",
-        "executive": "executive",
-        "employee": "employee",
-        "manager": "employee",
-        "team_leader": "employee",
-    }
-    frontend_role = role_map.get(role_value, role_value)
-
-    full_name = person.full_name or ""
-    initials = "".join(part[0].upper() for part in full_name.split() if part)[:2] or (email[0].upper() if email else "U")
-
-    return {
-        "id": str(person.id),
-        "name": full_name or email.split("@")[0],
-        "email": person.email,
-        "role": frontend_role,
-        "roleLabel": person.job_title or "Member",
-        "departmentId": str(person.department_id) if person.department_id else "dept-general",
-        "departmentName": dept_name,
-        "initials": initials,
-    }
+@router.post("/firebase-session", status_code=status.HTTP_200_OK, tags=["Authentication"])
+def firebase_session(data: FirebaseSessionRequest, db: Session = Depends(get_db)):
+    """Exchange a verified Firebase ID token for a scoped CORE session."""
+    tokens, person = AuthService.login_with_firebase(data.id_token, db)
+    return {**tokens.model_dump(), "profile": _profile_response(person, db)}
 
 
 @router.get(
@@ -88,17 +77,19 @@ def lookup_user_by_email(
 )
 def get_assignments_by_person(
     person_id: str = Query(..., description="Person UUID to fetch assignments for"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """
-    Public endpoint to get all assignments for a person by their UUID.
-    Used by the frontend dashboard after login — does not require a JWT.
+    Retrieve assignments after the caller has been authenticated and scoped.
     Returns assignment details including project name and project ID.
     """
     try:
         person_uuid = UUID(person_id)
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid person_id format"})
+
+    RBACService.assert_person_access(db, current_user, person_uuid)
 
     assignments = db.query(Assignment).filter(Assignment.person_id == person_uuid).all()
     result = []

@@ -7,7 +7,8 @@ from src.schemas.system import (
     SystemServiceAccountResponse,
 )
 from src.services.system import SystemService
-from src.core.database import get_db
+from src.core.database import get_rls_db_for
+from src.core.dependencies import CurrentUser, get_current_user, require_roles
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
@@ -21,7 +22,10 @@ router = APIRouter()
     summary="List System Users",
     tags=["System Users"],
 )
-def get_system_users(db: Session = Depends(get_db)) -> List[SystemUserResponse]:
+def get_system_users(
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    _: CurrentUser = Depends(require_roles("system_admin")),
+) -> List[SystemUserResponse]:
     """
     Retrieve a list of all registered system users.
 
@@ -38,7 +42,10 @@ def get_system_users(db: Session = Depends(get_db)) -> List[SystemUserResponse]:
     summary="List System Roles",
     tags=["Roles"],
 )
-def get_system_roles(db: Session = Depends(get_db)) -> List[SystemRoleResponse]:
+def get_system_roles(
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    _: CurrentUser = Depends(require_roles("system_admin")),
+) -> List[SystemRoleResponse]:
     """
     Retrieve a list of all system roles and their associated permissions.
 
@@ -55,7 +62,10 @@ def get_system_roles(db: Session = Depends(get_db)) -> List[SystemRoleResponse]:
     summary="List Audit Logs",
     tags=["Audit Logs"],
 )
-def get_system_audit_logs(db: Session = Depends(get_db)) -> List[SystemAuditResponse]:
+def get_system_audit_logs(
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    _: CurrentUser = Depends(require_roles("system_admin")),
+) -> List[SystemAuditResponse]:
     """
     Retrieve the system audit log for compliance and activity tracking.
 
@@ -73,7 +83,10 @@ def get_system_audit_logs(db: Session = Depends(get_db)) -> List[SystemAuditResp
     summary="List Service Accounts",
     tags=["Service Accounts"],
 )
-def get_service_accounts(db: Session = Depends(get_db)) -> List[SystemServiceAccountResponse]:
+def get_service_accounts(
+    db: Session = Depends(get_rls_db_for(get_current_user)),
+    _: CurrentUser = Depends(require_roles("system_admin")),
+) -> List[SystemServiceAccountResponse]:
     """
     Retrieve a list of all non-human service accounts used by the system.
 

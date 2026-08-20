@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { useAuth } from "@/lib/auth";
-import { getRequests } from "@/lib/api";
+import { getRequests, updateRequest } from "@/lib/api";
 
 export type RequestItem = {
   id: string;
@@ -47,8 +47,8 @@ export default function ApprovalsPage() {
           title: r.title || "",
           type: r.type || "IT Support",
           submitted: r.submitted || r.created_at || "",
-          status: r.status || "waiting",
-          statusLabel: r.statusLabel || "Pending",
+          status: r.status === "approved" ? "approved" : r.status === "rejected" ? "blocked" : r.status === "resolved" ? "completed" : "waiting",
+          statusLabel: r.status === "pending" ? "Pending Approval" : r.status?.replace("_", " ") || "Pending",
         })));
       })
       .catch(() => setRequests([]));
@@ -100,17 +100,27 @@ export default function ApprovalsPage() {
         rowActions={(row) => [
           {
             label: "Approve",
-            onClick: () => {
-              setRequests(prev => prev.map(r => r.id === row.id ? { ...r, status: "approved", statusLabel: "Approved" } : r));
-              setNotice(`Request ${row.id} approved (Simulated, backend write requires approval API).`);
+            onClick: async () => {
+              try {
+                await updateRequest(row.id, { status: "approved" }, token || undefined);
+                fetchRequests();
+                setNotice(`Request ${row.id} approved.`);
+              } catch {
+                setNotice(`Unable to approve ${row.id}. Please try again.`);
+              }
               setTimeout(() => setNotice(""), 4000);
             },
           },
           {
             label: "Reject",
-            onClick: () => {
-              setRequests(prev => prev.map(r => r.id === row.id ? { ...r, status: "rejected", statusLabel: "Rejected" } : r));
-              setNotice(`Request ${row.id} rejected (Simulated, backend write requires approval API).`);
+            onClick: async () => {
+              try {
+                await updateRequest(row.id, { status: "rejected" }, token || undefined);
+                fetchRequests();
+                setNotice(`Request ${row.id} rejected.`);
+              } catch {
+                setNotice(`Unable to reject ${row.id}. Please try again.`);
+              }
               setTimeout(() => setNotice(""), 4000);
             },
             danger: true,

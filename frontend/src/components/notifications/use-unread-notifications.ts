@@ -29,7 +29,7 @@ export interface UnreadNotificationsState {
   refresh: () => void;
 }
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 20_000;
 
 export function useUnreadNotifications(previewLimit = 5): UnreadNotificationsState {
   const { loading: authLoading, user, token } = useAuth();

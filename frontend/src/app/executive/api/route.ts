@@ -1,22 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import path from "path";
-import { getExecutiveDemoData } from "./demo-data";
+import {
+  fetchOverview,
+  fetchDepartments,
+  fetchPortfolio,
+  fetchRisks,
+  fetchDigests,
+  fetchReports,
+} from "./queries";
 
-type ExecutiveAction = "overview" | "departments" | "portfolio" | "risks" | "digests" | "reports";
-const LIVE_QUERY_TIMEOUT_MS = 4500;
-
-function getPythonCommand() {
-  if (process.env.PYTHON_BIN) {
-    return process.env.PYTHON_BIN;
-  }
-  if (process.platform === "win32") {
-    return "py -3";
-  }
-  return "python3";
-}
+type ExecutiveAction =
+  | "overview"
+  | "departments"
+  | "portfolio"
+  | "risks"
+  | "digests"
+  | "reports";
 
 export async function GET(req: NextRequest) {
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
+  const sessionToken = req.cookies.get("core_session_token")?.value;
+  if (!apiBase || !sessionToken) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  const sessionResponse = await fetch(`${apiBase}/api/v1/me`, {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+    cache: "no-store",
+  }).catch(() => null);
+  if (!sessionResponse?.ok) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  const session = await sessionResponse.json();
+  if (!["executive", "system_admin"].includes(session.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
 
@@ -24,40 +41,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No action specified" }, { status: 400 });
   }
 
-  // Allowed action queries to prevent command injection
-  const allowedActions: ExecutiveAction[] = ["overview", "departments", "portfolio", "risks", "digests", "reports"];
+  const allowedActions: ExecutiveAction[] = [
+    "overview",
+    "departments",
+    "portfolio",
+    "risks",
+    "digests",
+    "reports",
+  ];
   if (!allowedActions.includes(action as ExecutiveAction)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
+
   const requestedAction = action as ExecutiveAction;
 
-  const scriptPath = path.join(process.cwd(), "src", "app", "executive", "db_query.py");
-  const fallback = () => {
-    const response = NextResponse.json(getExecutiveDemoData(requestedAction));
-    response.headers.set("x-core-data-source", "demo-fallback");
-    return response;
-  };
+  try {
+    let data: any;
+    switch (requestedAction) {
+      case "overview":
+        data = await fetchOverview();
+        break;
+      case "departments":
+        data = await fetchDepartments();
+        break;
+      case "portfolio":
+        data = await fetchPortfolio();
+        break;
+      case "risks":
+        data = await fetchRisks();
+        break;
+      case "digests":
+        data = await fetchDigests();
+        break;
+      case "reports":
+        data = await fetchReports();
+        break;
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
 
-  return new Promise<NextResponse>((resolve) => {
-    const command = `${getPythonCommand()} "${scriptPath}" ${requestedAction}`;
-    exec(command, { timeout: LIVE_QUERY_TIMEOUT_MS }, (error, stdout, stderr) => {
-      if (error) {
-        console.warn("Executive live query failed; using demo fallback.", error.message, stderr);
-        resolve(fallback());
-        return;
-      }
-      try {
-        const data = JSON.parse(stdout);
-        if (data?.error) {
-          console.warn("Executive live query returned an error; using demo fallback.", data.error);
-          resolve(fallback());
-          return;
-        }
-        resolve(NextResponse.json(data));
-      } catch (parseError) {
-        console.warn("Executive live query returned invalid JSON; using demo fallback.", parseError, stdout);
-        resolve(fallback());
-      }
-    });
-  });
+    const response = NextResponse.json(data);
+    response.headers.set("x-core-data-source", "live-database");
+    return response;
+  } catch (error: any) {
+    console.error(`Executive live query (${requestedAction}) failed:`, error?.message || error);
+    return NextResponse.json({ error: "Executive reporting is temporarily unavailable." }, { status: 503 });
+  }
 }

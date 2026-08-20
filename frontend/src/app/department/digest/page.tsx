@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/lib/auth";
-import { getAssignments, getProjects, getPeople } from "@/lib/api";
+import { getAssignments, getBlockers, getProjects, getPeople } from "@/lib/api";
 
 interface DigestItem {
   id: string;
@@ -28,19 +28,22 @@ export default function DigestPage() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [team, setTeam] = useState<any[]>([]);
+  const [blockers, setBlockers] = useState<any[]>([]);
 
   const sync = useCallback(async () => {
     if (!token || !user) return;
     const deptId = user.departmentId;
     try {
-      const [aData, pData, tData] = await Promise.all([
+      const [aData, pData, tData, blockerData] = await Promise.all([
         getAssignments(token).catch(() => []),
         getProjects(token).catch(() => []),
         getPeople(token).catch(() => []),
+        getBlockers(token).catch(() => []),
       ]);
       setAssignments((Array.isArray(aData) ? aData : []).filter((a: any) => a.departmentId === deptId));
       setProjects((Array.isArray(pData) ? pData : []).filter((p: any) => p.departmentId === deptId));
       setTeam((Array.isArray(tData) ? tData : []).filter((m: any) => !m.departmentId || m.departmentId === deptId));
+      setBlockers((Array.isArray(blockerData) ? blockerData : []).filter((item: any) => !item.department_id || item.department_id === deptId));
     } catch (e) {
       console.error(e);
     }
@@ -50,8 +53,6 @@ export default function DigestPage() {
     sync();
   }, [sync]);
 
-  // Blockers not yet available from backend — empty array until endpoint is added
-  const blockers: any[] = [];
 
   const metrics = useMemo(() => {
     const completedCount = assignments.filter(
@@ -158,7 +159,7 @@ export default function DigestPage() {
         ]}
         primaryAction={{
           label: "Export PDF",
-          onClick: () => setNotice("PDF export is ready for permission-gated API wiring."),
+          onClick: () => window.print(),
         }}
         secondaryActions={[
           {

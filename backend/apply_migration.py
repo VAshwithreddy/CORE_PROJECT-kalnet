@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+
 
 def main():
     load_dotenv()
@@ -16,18 +19,34 @@ def main():
     print(f"Connecting to database...")
     engine = create_engine(db_url)
 
-    migrations_dir = "migrations"
-    sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
+    migrations_dir = Path(__file__).parent / "migrations"
+    sql_files = sorted(path for path in migrations_dir.glob("*.sql"))
 
-    with engine.connect() as conn:
-        for fname in sql_files:
-            fpath = os.path.join(migrations_dir, fname)
-            print(f"Applying migration {fname}...")
-            with open(fpath, "r", encoding="utf-8") as f:
-                sql = f.read()
-            conn.execute(text(sql))
-            conn.commit()
-            print(f"Migration {fname} applied successfully.")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                filename TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """))
+
+    for path in sql_files:
+        with engine.begin() as conn:
+            already_applied = conn.execute(
+                text("SELECT 1 FROM schema_migrations WHERE filename = :filename"),
+                {"filename": path.name},
+            ).scalar()
+            if already_applied:
+                print(f"Skipping {path.name}; already applied.")
+                continue
+
+            print(f"Applying migration {path.name}...")
+            conn.execute(text(path.read_text(encoding="utf-8")))
+            conn.execute(
+                text("INSERT INTO schema_migrations (filename) VALUES (:filename)"),
+                {"filename": path.name},
+            )
+            print(f"Migration {path.name} applied successfully.")
 
     print("All migrations applied successfully.")
 
