@@ -64,14 +64,15 @@ def get_system_roles(
 )
 def get_system_audit_logs(
     db: Session = Depends(get_rls_db_for(get_current_user)),
-    _: CurrentUser = Depends(require_roles("system_admin")),
+    _: CurrentUser = Depends(require_roles("system_admin", "work_admin")),
 ) -> List[SystemAuditResponse]:
     """
     Retrieve the system audit log for compliance and activity tracking.
 
     Each entry records the **action** performed, the **user** who performed it,
     a human-readable **details** string, the **timestamp**, and the originating
-    **IP address**. Useful for security reviews and change management.
+    **IP address**. System administrators and work administrators can review
+    this metadata-only log for security reviews and change management.
     """
     return SystemService.get_audit_logs(db)
 

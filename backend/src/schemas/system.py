@@ -22,6 +22,10 @@ class SystemAuditResponse(BaseModel):
     details: str = Field(..., description="Detailed description of the action", example="Created new project 'Authentication V2'")
     timestamp: str = Field(..., description="When the action occurred", example="2026-07-15T09:15:00Z")
     ip_address: Optional[str] = Field(None, description="IP address from which the action was performed", example="192.168.1.55")
+    actor: str = Field(..., description="Name or email of the person who performed the action")
+    role: str = Field(..., description="Role of the person who performed the action")
+    target: str = Field(..., description="Audited entity and, when available, its ID")
+    outcome: str = Field(..., description="Recorded audit outcome")
 
 class SystemServiceAccountResponse(BaseModel):
     id: UUID = Field(..., description="Unique ID of the service account")

@@ -128,8 +128,13 @@ class SystemService:
 
     @staticmethod
     def get_audit_logs(db: Session) -> List[SystemAuditResponse]:
-        """Retrieve all system audit logs ordered by newest first."""
-        logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).all()
+        """Retrieve audit logs with human-readable actor and target metadata."""
+        logs = (
+            db.query(AuditLog, Person)
+            .outerjoin(Person, Person.id == AuditLog.actor_id)
+            .order_by(AuditLog.created_at.desc())
+            .all()
+        )
         return [
             SystemAuditResponse(
                 id=log.id,
@@ -138,8 +143,12 @@ class SystemService:
                 details=log.details or "",
                 timestamp=log.timestamp.isoformat() if log.timestamp else "",
                 ip_address=log.ip_address,
+                actor=(person.full_name or person.email) if person else "System",
+                role=(person.role.value if hasattr(person.role, "value") else str(person.role)) if person else "system",
+                target=f"{log.entity} · {log.entity_id}" if log.entity_id else log.entity,
+                outcome="success",
             )
-            for log in logs
+            for log, person in logs
         ]
 
     @staticmethod

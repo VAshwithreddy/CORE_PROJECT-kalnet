@@ -40,24 +40,35 @@ export default function SystemAuditPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchEvents = useCallback(() => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getAuditEvents(token)
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setEvents(list.map((e: any) => ({
           id: e.id || "",
           timestamp: e.timestamp || e.created_at || "",
-          actor: e.actor || e.actor_name || e.username || "System",
-          role: e.role || "system-admin",
+          actor: e.actor || "System",
+          role: e.role || "system",
           action: e.action || "",
-          target: e.target || "",
-          outcome: (e.outcome === "SUCCESS" || e.outcome === "success") ? "approved" : "rejected",
-          outcomeLabel: e.outcome || "Success",
+          target: e.target || e.details || "—",
+          outcome: e.outcome === "success" ? "approved" : "rejected",
+          outcomeLabel: e.outcome === "success" ? "Success" : "Unknown",
         })));
+        setError(null);
       })
-      .catch(() => setEvents([]));
+      .catch((err) => {
+        setEvents([]);
+        setError(err instanceof Error ? err.message : "Unable to load audit events.");
+      })
+      .finally(() => setLoading(false));
   }, [token]);
 
   useEffect(() => {
@@ -125,7 +136,16 @@ export default function SystemAuditPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} rows={filtered} rowKey={(e) => e.id} />
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        loading={loading}
+        rowKey={(e) => e.id}
+        emptyState={{
+          title: error ? "Audit log could not be loaded" : "No audit events yet",
+          body: error || "Recorded actions will appear here.",
+        }}
+      />
     </SystemAdminShell>
   );
 }
