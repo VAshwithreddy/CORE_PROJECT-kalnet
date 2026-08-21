@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -9,6 +10,24 @@ load_dotenv()  # loads values from .env into os.getenv()
 def _csv_env(name: str, default: str) -> list[str]:
     value = os.getenv(name, default)
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _firebase_service_account_json() -> str:
+    """Load Firebase Admin credentials from an environment value or secret file."""
+    inline_value = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+    if inline_value:
+        return inline_value
+
+    secret_file = os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE", "").strip()
+    if not secret_file:
+        return ""
+    try:
+        return Path(secret_file).read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise RuntimeError(
+            "FIREBASE_SERVICE_ACCOUNT_FILE could not be read. "
+            "Check the deployed secret-file path."
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -41,12 +60,15 @@ def load_settings() -> Settings:
     jwks_url = os.getenv("JWKS_URL", "")
     environment = os.getenv("CORE_ENV", "development").lower()
     secret_key = os.getenv("SECRET_KEY", "")
+    firebase_service_account_json = _firebase_service_account_json()
     if environment == "production" and (not secret_key or secret_key == "insecure-default-secret-key"):
         raise RuntimeError("SECRET_KEY must be set to a strong unique value in production.")
     if environment == "production" and not os.getenv("CORE_ALLOWED_ORIGINS"):
         raise RuntimeError("CORE_ALLOWED_ORIGINS must list the production frontend origin.")
-    if environment == "production" and not os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"):
-        raise RuntimeError("FIREBASE_SERVICE_ACCOUNT_JSON must be configured in production.")
+    if environment == "production" and not firebase_service_account_json:
+        raise RuntimeError(
+            "Configure FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_FILE in production."
+        )
 
     if not jwks_url:
         # Extract from database_url if it's a Supabase pooler/direct connection
@@ -81,7 +103,7 @@ def load_settings() -> Settings:
             "CORE_ALLOW_DEV_PASSWORDLESS_LOGIN",
             "true" if environment != "production" else "false",
         ).lower() == "true",
-        firebase_service_account_json=os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", ""),
+        firebase_service_account_json=firebase_service_account_json,
 
         # Notification AI Intelligence
         ai_enabled=os.getenv("AI_ENABLED", "false").lower() == "true",

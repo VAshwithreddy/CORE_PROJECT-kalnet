@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { routeAccess, canAccessRoute } from "./lib/route-policy";
 import type { UserRole } from "./lib/roles";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Static files, _next, favicon, and Next.js API route handlers bypass middleware auth.
