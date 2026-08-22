@@ -6,7 +6,7 @@ export async function apiClient<TResponse>(
   path: string,
   options: ApiClientOptions = {},
 ): Promise<TResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
   const headers = new Headers(options.headers);
 
   if (!headers.has("Content-Type") && options.body) {
