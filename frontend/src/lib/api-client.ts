@@ -6,14 +6,11 @@ export async function apiClient<TResponse>(
   path: string,
   options: ApiClientOptions = {},
 ): Promise<TResponse> {
-  const baseUrl =
-    process.env.NODE_ENV === "production"
-      ? "https://my-core-project.onrender.com"
-      : (
-          process.env.NEXT_PUBLIC_API_URL ||
-          process.env.NEXT_PUBLIC_API_BASE_URL ||
-          "http://localhost:8000"
-        ).replace(/\/$/, "");
+  const baseUrl = (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8000"
+  ).replace(/\/$/, "");
 
   const headers = new Headers(options.headers);
 
