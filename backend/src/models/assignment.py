@@ -18,6 +18,7 @@ class Assignment(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     role = Column(String, nullable=False)
     status = Column(String, nullable=False, default="on_track")
+    priority = Column(String, nullable=False, default="Medium")
     @property
     def allocation_percent(self) -> int:
         return 100

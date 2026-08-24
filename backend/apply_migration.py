@@ -16,7 +16,8 @@ def main():
     print(f"Connecting to database...")
     engine = create_engine(db_url)
 
-    migrations_dir = "migrations"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    migrations_dir = os.path.join(base_dir, "migrations")
     sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
 
     with engine.connect() as conn:

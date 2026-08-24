@@ -16,6 +16,7 @@ class AssignmentResponse(BaseModel):
 
     role: str
     status: str
+    priority: str = "Medium"
 
     start_date: date
     end_date: Optional[date] = None
@@ -39,6 +40,7 @@ class AssignmentCreate(BaseModel):
 
     role: Optional[str] = "developer"
     status: Optional[str] = "active"
+    priority: Optional[str] = "Medium"
     allocation_percent: Optional[int] = 100
 
     start_date: Optional[date] = None

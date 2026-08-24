@@ -71,6 +71,7 @@ class AssignmentsService:
             project_name=project_name,
             role=assignment.role or "developer",
             status=assignment.status or "active",
+            priority=assignment.priority or "Medium",
             start_date=assignment.start_date or date.today(),
             end_date=assignment.end_date,
             created_at=assignment.created_at or datetime.now(),
@@ -252,6 +253,7 @@ class AssignmentsService:
             person_id=person_uuid,
             role=data.role or "developer",
             status=status_val,
+            priority=data.priority or "Medium",
             start_date=start_date,
             end_date=end_date,
         )

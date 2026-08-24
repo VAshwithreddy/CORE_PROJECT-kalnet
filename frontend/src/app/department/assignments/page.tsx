@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge, type BadgeStatus } from "@/components/status-badge";
 import { SelectInput, TextInput } from "@/components/form-controls";
 import { useAuth } from "@/lib/auth";
-import { getAssignments, getProjects, getPeople } from "@/lib/api";
+import { getAssignments, getProjects, getPeople, createAssignment } from "@/lib/api";
 
 type Assignment = {
   id: string;
@@ -67,6 +67,8 @@ export default function AssignmentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("Details");
   const [notice, setNotice] = useState("");
+  const [noticeType, setNoticeType] = useState<"success" | "error">("success");
+  const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // New task form state
@@ -90,7 +92,7 @@ export default function AssignmentsPage() {
       setAssignments(all.filter((a: any) => !a.departmentId || a.departmentId === deptId));
 
       const allP = Array.isArray(pData) ? pData : [];
-      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.name || p.id, label: p.name })));
+      setProjects(allP.filter((p: any) => !p.departmentId || p.departmentId === deptId).map((p: any) => ({ value: p.id, label: p.name || p.id })));
 
       const allT = Array.isArray(tData) ? tData : [];
       setTeamMembers(allT.filter((m: any) => !m.departmentId || m.departmentId === deptId).map((m: any) => ({ value: m.id, label: m.name })));
@@ -146,19 +148,52 @@ export default function AssignmentsPage() {
     setTimeout(() => setNotice(""), 4000);
   };
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!newTaskTitle || !newTaskProject || !newTaskOwner) {
       alert("Please fill in all required fields.");
       return;
     }
-    const ownerName = teamMembers.find(m => m.value === newTaskOwner)?.label || newTaskOwner;
-    // Backend POST /api/v1/assignments — requires privileged role
-    setNotice(`Assignment "${newTaskTitle}" creation queued. Backend requires manager role.`);
-    setTimeout(() => setNotice(""), 4000);
-    setIsNewTaskOpen(false);
-    setNewTaskTitle("");
-    setNewTaskProject("");
-    setNewTaskOwner("");
+    setSubmitting(true);
+    try {
+      const created = await createAssignment(
+        {
+          project_id: newTaskProject,
+          person_id: newTaskOwner,
+          role: newTaskTitle,
+          status: "active",
+          priority: newTaskPriority,
+          start_date: new Date().toISOString().split("T")[0],
+        },
+        token ?? undefined
+      );
+      // Normalise the returned assignment to match the local shape
+      const normalised: Assignment = {
+        id: created.id,
+        title: created.role || newTaskTitle,
+        project: created.project_name || "Unknown Project",
+        projectId: created.project_id || newTaskProject,
+        owner: created.person_name || "Unknown",
+        ownerId: created.person_id || newTaskOwner,
+        departmentId: created.department_id || user?.departmentId || "",
+        status: (created.status === "on_track" ? "in-progress" : created.status) as Assignment["status"],
+        priority: newTaskPriority,
+        dueDate: created.end_date || "—",
+        progress: 0,
+      };
+      setAssignments((prev) => [...prev, normalised]);
+      setNoticeType("success");
+      setNotice(`Assignment "${newTaskTitle}" created successfully.`);
+    } catch (err: any) {
+      setNoticeType("error");
+      setNotice(err?.message || "Failed to create assignment. Check your permissions.");
+    } finally {
+      setSubmitting(false);
+      setIsNewTaskOpen(false);
+      setNewTaskTitle("");
+      setNewTaskProject("");
+      setNewTaskOwner("");
+      setTimeout(() => setNotice(""), 5000);
+    }
   };
 
   if (!mounted) {
@@ -195,7 +230,7 @@ export default function AssignmentsPage() {
       />
 
       {notice && (
-        <div className="alert-strip alert-strip--success" role="status" style={{ marginBottom: 24 }}>
+        <div className={`alert-strip alert-strip--${noticeType}`} role="status" style={{ marginBottom: 24 }}>
           <span>{notice}</span>
         </div>
       )}
@@ -366,8 +401,8 @@ export default function AssignmentsPage() {
             <button className="core-button" onClick={() => setIsNewTaskOpen(false)}>
               Cancel
             </button>
-            <button className="core-button core-button-primary" onClick={handleCreateTask}>
-              Create Task
+            <button className="core-button core-button-primary" onClick={handleCreateTask} disabled={submitting}>
+              {submitting ? "Creating…" : "Create Task"}
             </button>
           </div>
         </DrawerSection>

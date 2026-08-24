@@ -72,7 +72,7 @@ def get_assignment_by_id(
     "", 
     response_model=AssignmentResponse, 
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES))]
+    dependencies=[Depends(require_roles(*PRIVILEGED_ROLES, *MANAGER_ROLES))]
 )
 def create_assignment(
     assignment_data: AssignmentCreate, 
