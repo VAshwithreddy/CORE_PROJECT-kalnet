@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { DetailDrawer, DrawerSection, DrawerField } from "@/components/detail-drawer";
+import { useAuth } from "@/lib/auth";
+import { getRisks, escalateRisk, mitigateRisk } from "@/lib/api";
 
 // Custom SVGs
 const WarningIcon = () => (
@@ -37,6 +39,7 @@ interface Risk {
 }
 
 export default function ExecutiveRisksPage() {
+  const { token } = useAuth();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,13 +53,10 @@ export default function ExecutiveRisksPage() {
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
 
   // Fetch risks data
-  useEffect(() => {
+  const fetchRisks = () => {
+    if (!token) return;
     setLoading(true);
-    fetch("/executive/api?action=risks")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch risks data");
-        return res.json();
-      })
+    getRisks(token)
       .then((data) => {
         if (data.error) throw new Error(data.error);
         setRisks(data);
@@ -69,21 +69,44 @@ export default function ExecutiveRisksPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
-
-  // Handle local state updates (simulation on top of DB fetch)
-  const handleEscalateRisk = (id: string) => {
-    setRisks((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "Escalated" } : r))
-    );
-    setSelectedRisk((prev) => (prev && prev.id === id ? { ...prev, status: "Escalated" } : prev));
   };
 
+  useEffect(() => {
+    if (token) {
+      fetchRisks();
+    } else {
+      // In case we don't have a token, we might still be loading auth
+      setLoading(false);
+    }
+  }, [token]);
+
+  // Handle escalation backend persistence
+  const handleEscalateRisk = (id: string) => {
+    const reason = window.prompt("Reason for escalation:", "Escalated by Executive for immediate action.");
+    if (reason === null) return; // user cancelled
+
+    escalateRisk(id, reason, token || "")
+      .then(() => {
+        fetchRisks();
+        setSelectedRisk(null);
+      })
+      .catch((err) => {
+        alert("Failed to escalate risk: " + err.message);
+      });
+  };
+
+  // Handle mitigation backend persistence
   const handleMitigateRisk = (id: string) => {
-    setRisks((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "Mitigated", progress: 100 } : r))
-    );
-    setSelectedRisk((prev) => (prev && prev.id === id ? { ...prev, status: "Mitigated", progress: 100 } : prev));
+    if (!window.confirm("Are you sure you want to mark this risk as mitigated?")) return;
+
+    mitigateRisk(id, token || "")
+      .then(() => {
+        fetchRisks();
+        setSelectedRisk(null);
+      })
+      .catch((err) => {
+        alert("Failed to mitigate risk: " + err.message);
+      });
   };
 
   // Filter logic
